@@ -5,6 +5,9 @@
 #include "Rendering/SkeletalMeshRenderData.h"
 #include "Rendering/SkeletalMeshModel.h"
 #include "UObject/ObjectSaveContext.h"
+
+#include UE_INLINE_GENERATED_CPP_BY_NAME(BlastMesh)
+
 #if WITH_EDITOR
 #include "Engine/SkinnedAssetCommon.h"
 #include "RawMesh.h"

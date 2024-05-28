@@ -11,6 +11,8 @@
 #include "Physics/Experimental/ChaosScopedSceneLock.h"
 #include "Physics/Experimental/PhysScene_Chaos.h"
 
+#include UE_INLINE_GENERATED_CPP_BY_NAME(BlastExtendedSupport)
+
 UBlastExtendedSupportMeshComponent::UBlastExtendedSupportMeshComponent(const FObjectInitializer& ObjectInitializer)
 	: UBlastMeshComponent(ObjectInitializer)
 {

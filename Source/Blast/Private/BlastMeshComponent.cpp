@@ -24,6 +24,8 @@
 #include "BlastExtendedSupport.h"
 #include "Rendering/SkeletalMeshRenderData.h"
 
+#include UE_INLINE_GENERATED_CPP_BY_NAME(BlastMeshComponent)
+
 
 #if BLAST_USE_PHYSX
 #else
