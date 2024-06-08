@@ -480,10 +480,10 @@ void FBlastCookedChunkData::AppendToBodySetup(UBodySetup* NewBodySetup) const
 	//Should we check the PhysicalMaterial, etc are the same
 	NewBodySetup->AddCollisionFrom(CookedBodySetup);
 
-	UpdateAfterShapesAdded(NewBodySetup, ConvexMeshes);
+	UpdateAfterShapesAdded(NewBodySetup, MoveTemp(ConvexMeshes));
 }
 
-void FBlastCookedChunkData::UpdateAfterShapesAdded(UBodySetup* NewBodySetup, ConvexMeshTempList& ConvexMeshes) const
+void FBlastCookedChunkData::UpdateAfterShapesAdded(UBodySetup* NewBodySetup, ConvexMeshTempList ConvexMeshes)
 {
 	//Always make sure these get set since they are cleared on copy
 	bool bAllThere = true;
@@ -501,7 +501,7 @@ void FBlastCookedChunkData::UpdateAfterShapesAdded(UBodySetup* NewBodySetup, Con
 #if BLAST_USE_PHYSX
 		New.SetConvexMesh(ConvexMeshes[C]);
 #else
-		New.SetChaosConvexMesh(TSharedPtr<Chaos::FConvex>(ConvexMeshes[C]));
+		New.SetConvexMeshObject(MoveTemp(ConvexMeshes[C]));
 #endif
 	}
 

@@ -4,14 +4,12 @@
 #include "BlastMesh.h"
 #include "BlastGlobals.h"
 #include "PhysicsPublic.h"
-#include "Misc/LocalTimestampDirectoryVisitor.h"
 #include "FbxImporter.h"
 #include "Misc/FbxErrors.h"
 #include "AssetToolsModule.h"
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "PhysicsAssetUtils.h"
 #include "PhysicsEngine/PhysicsAsset.h"
-#include "NvBlastExtSerialization.h"
 #include "BlastImportUI.h"
 #include "Factories/FbxSkeletalMeshImportData.h"
 #include "Misc/FeedbackContext.h"
@@ -267,7 +265,7 @@ EReimportResult::Type UBlastMeshFactory::Reimport(UObject* Obj)
 	ReimportMesh = ExistingBlastMesh;
 
 	// Run the import again
-	EReimportResult::Type Result = EReimportResult::Failed;
+	EReimportResult::Type Result;
 	bool OutCanceled = false;
 
 	if (ImportObject(ExistingBlastMesh->GetClass(), ExistingBlastMesh->GetOuter(), *ExistingBlastMesh->GetName(), ExistingBlastMesh->GetFlags(), Filenames[0], nullptr, OutCanceled) != nullptr)
@@ -488,6 +486,7 @@ USkeletalMesh* UBlastMeshFactory::ImportSkeletalMesh(UBlastMesh* BlastMesh, FNam
 						}
 					}
 
+					bool bMapMorphTargetToTimeZero = false;
 					FSkeletalMeshImportData OutData;
 					UnFbx::FFbxImporter::FImportSkeletalMeshArgs ImportArgs;
 					ImportArgs.InParent = BlastMesh;
@@ -506,9 +505,10 @@ USkeletalMesh* UBlastMeshFactory::ImportSkeletalMesh(UBlastMesh* BlastMesh, FNam
 
 						//UFactory::CurrentFilename = PreviousFileName;
 
-						if (NewMesh)
+						if (NewMesh && !FbxImporter->GetImportOperationCancelled())
 						{
 							//Increment the LOD index
+							bMapMorphTargetToTimeZero = ImportArgs.bMapMorphTargetToTimeZero;
 							SuccessfulLodIndex++;
 						}
 					}
@@ -519,11 +519,12 @@ USkeletalMesh* UBlastMeshFactory::ImportSkeletalMesh(UBlastMesh* BlastMesh, FNam
 
 						USkeletalMesh* BaseSkeletalMesh = NewMesh;
 						USkeletalMesh* LODObject = FbxImporter->ImportSkeletalMesh(ImportArgs);
-						bool bImportSucceeded = FbxImporter->ImportSkeletalMeshLOD(LODObject, BaseSkeletalMesh, SuccessfulLodIndex);
+						bool bImportSucceeded = !FbxImporter->GetImportOperationCancelled() && FbxImporter->ImportSkeletalMeshLOD(LODObject, BaseSkeletalMesh, SuccessfulLodIndex);
 
 						if (bImportSucceeded)
 						{
 							BaseSkeletalMesh->GetLODInfo(SuccessfulLodIndex)->ScreenSize = 1.0f / (MaxLODLevel * SuccessfulLodIndex);
+							bMapMorphTargetToTimeZero = ImportArgs.bMapMorphTargetToTimeZero;
 							ImportedSuccessfulLodIndex = SuccessfulLodIndex;
 							SuccessfulLodIndex++;
 						}
@@ -540,8 +541,8 @@ USkeletalMesh* UBlastMeshFactory::ImportSkeletalMesh(UBlastMesh* BlastMesh, FNam
 						FBXImportOptions->bImportMaterials = 0;
 						uint32 bImportTextures = FBXImportOptions->bImportTextures;
 						FBXImportOptions->bImportTextures = 0;
-
-						FbxImporter->ImportFbxMorphTarget(SkelMeshNodeArray, NewMesh, ImportedSuccessfulLodIndex, OutData);
+						
+						FbxImporter->ImportFbxMorphTarget(SkelMeshNodeArray, NewMesh, ImportedSuccessfulLodIndex, OutData, bMapMorphTargetToTimeZero);
 
 						FBXImportOptions->bImportMaterials = !!bImportMaterials;
 						FBXImportOptions->bImportTextures = !!bImportTextures;

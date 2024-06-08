@@ -318,9 +318,9 @@ private:
 #if BLAST_USE_PHYSX
 	typedef TArray<physx::PxConvexMesh*, TInlineAllocator<32>> ConvexMeshTempList;
 #else
-	typedef TArray<TSharedPtr<Chaos::FConvex>, TInlineAllocator<32>> ConvexMeshTempList;
+	typedef TArray<Chaos::FConvexPtr, TInlineAllocator<32>> ConvexMeshTempList;
 #endif
-	void UpdateAfterShapesAdded(class UBodySetup* NewBodySetup, ConvexMeshTempList& ConvexMeshes) const;
+	static void UpdateAfterShapesAdded(class UBodySetup* NewBodySetup, ConvexMeshTempList ConvexMeshes);
 };
 
 /*

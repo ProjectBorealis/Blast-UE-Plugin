@@ -48,17 +48,4 @@ void UActorFactoryBlastMesh::PostSpawnActor(UObject* Asset, AActor* NewActor)
 	BlastComponent->SetBlastMesh(BlastMesh);
 }
 
-void UActorFactoryBlastMesh::PostCreateBlueprint(UObject* Asset, AActor* CDO)
-{
-	Super::PostCreateBlueprint(Asset, CDO);
-
-	if (Asset != NULL && CDO != NULL)
-	{
-		UBlastMesh* BlastMesh = Cast<UBlastMesh>(Asset);
-		UBlastMeshComponent* BlastComponent = Cast<ABlastMeshActor>(CDO)->GetBlastMeshComponent();
-		// Change properties
-		BlastComponent->SetBlastMesh(BlastMesh);
-	}
-}
-
 #undef LOCTEXT_NAMESPACE

@@ -1,5 +1,6 @@
 #include "BlastMeshComponent.h"
 
+#include "Engine/OverlapResult.h"
 #include "TimerManager.h"
 #include "PhysicsEngine/BodySetup.h"
 #include "PhysicsEngine/PhysicsAsset.h"
