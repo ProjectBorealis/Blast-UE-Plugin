@@ -146,8 +146,8 @@ struct FBlastFractureHistory
 			}
 			Tail = Head = Curr = 0;
 			Capacity = 1;
-			ToolDataHistory.SetNum(Capacity, false);
-			LoadedAssetHistory.SetNum(Capacity, false);
+			ToolDataHistory.SetNum(Capacity, EAllowShrinking::No);
+			LoadedAssetHistory.SetNum(Capacity, EAllowShrinking::No);
 		}
 	}
 

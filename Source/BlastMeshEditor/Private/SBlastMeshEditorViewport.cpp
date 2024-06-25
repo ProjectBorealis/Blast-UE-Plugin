@@ -457,17 +457,21 @@ void FBlastMeshEditorViewportClient::Draw(const FSceneView* View, FPrimitiveDraw
 					}
 					break;
 				case EBlastFractureMethod::Cut:
-					Normal = Tr.TransformVector(FVector(FS->CutFracture->Normal.V));
-					Origin = Tr.TransformPosition(FVector(FS->CutFracture->Point.V)) + Displacement;
-					Scale = FVector(2 * MeshBounds.SphereRadius, 2 * MeshBounds.SphereRadius, 0);
 				case EBlastFractureMethod::Cutout:
-					if (FS->FractureMethod == EBlastFractureMethod::Cutout)
+					if (FS->FractureMethod == EBlastFractureMethod::Cut)
+					{
+						Normal = Tr.TransformVector(FVector(FS->CutFracture->Normal.V));
+						Origin = Tr.TransformPosition(FVector(FS->CutFracture->Point.V)) + Displacement;
+						Scale = FVector(2 * MeshBounds.SphereRadius, 2 * MeshBounds.SphereRadius, 0);
+					}
+					else // FS->FractureMethod == EBlastFractureMethod::Cutout
 					{
 						Normal = Tr.TransformVector(FVector(FS->CutoutFracture->Normal.V));
 						Origin = Tr.TransformPosition(FVector(FS->CutoutFracture->Origin.V)) + Displacement;
 						Scale = FVector(FS->CutoutFracture->Size.X, FS->CutoutFracture->Size.Y,
 						                FS->CutoutFracture->RotationZ);
 					}
+
 					{
 						FTransform ScaleTr;
 						ScaleTr.SetScale3D(FVector(Scale.X, Scale.Y, 1.f) * 0.5f);

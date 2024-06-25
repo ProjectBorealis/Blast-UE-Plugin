@@ -115,7 +115,7 @@ FBox UViewportBlastMeshComponent::GetChunkWorldBounds(int32 ChunkIndex) const
 		int32 BodyIndex = BlastMesh->PhysicsAsset->FindBodyIndex(ChunkBone);
 		if (ChunkBone != NAME_None && BlastMesh->PhysicsAsset->SkeletalBodySetups.IsValidIndex(BodyIndex))
 		{
-			const UBodySetup* BodySetup = BlastMesh->PhysicsAsset->SkeletalBodySetups[BodyIndex];
+			const USkeletalBodySetup* BodySetup = BlastMesh->PhysicsAsset->SkeletalBodySetups[BodyIndex];
 			if (BodySetup != nullptr)
 			{
 				int32 BoneIndex = BlastMesh->ChunkIndexToBoneIndex[ChunkIndex];

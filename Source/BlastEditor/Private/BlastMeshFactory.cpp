@@ -605,7 +605,7 @@ bool UBlastMeshFactory::RebuildPhysicsAsset(UBlastMesh* BlastMesh, const TMap<FN
 			FName boneName = chunk.Key;
 			FPhysAssetCreateParams assetCreateParams = FPhysAssetCreateParams();
 			int32 NewBodyIndex = FPhysicsAssetUtils::CreateNewBody(Asset, boneName, assetCreateParams);
-			UBodySetup* bs = Asset->SkeletalBodySetups[NewBodyIndex];
+			USkeletalBodySetup* bs = Asset->SkeletalBodySetups[NewBodyIndex];
 			bs->RemoveSimpleCollision();
 
 			const FMatrix WorldToBoneXForm = BlastMesh->Mesh->GetComposedRefPoseMatrix(boneName).Inverse();

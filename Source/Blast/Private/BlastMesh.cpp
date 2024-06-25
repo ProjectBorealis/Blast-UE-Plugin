@@ -51,7 +51,9 @@ void UBlastMesh::GetAssetRegistryTags(TArray<FAssetRegistryTag>& OutTags) const
 	}
 #endif
 
+	PRAGMA_DISABLE_DEPRECATION_WARNINGS
 	Super::GetAssetRegistryTags(OutTags);
+	PRAGMA_ENABLE_DEPRECATION_WARNINGS
 }
 
 void UBlastMesh::PostLoad()
@@ -170,7 +172,7 @@ void UBlastMesh::RebuildCookedBodySetupsIfRequired(bool bForceRebuild)
 		{
 			//Transform these ahead of time and cache since InitialBoneTransform is constant
 			//Always make the initial actor at the component space origin, this allows the actor space to correspond to the at-rest position which Blast internally uses
-			UBodySetup* PhysicsAssetBodySetup = PhysicsAsset->SkeletalBodySetups[BodySetupIndex];
+			USkeletalBodySetup* PhysicsAssetBodySetup = PhysicsAsset->SkeletalBodySetups[BodySetupIndex];
 			//Whenever this setup is changed the guid is changed
 			if (bForceRebuild || CurCookedChunkData.SourceBodySetupGUID != PhysicsAssetBodySetup->BodySetupGuid)
 			{

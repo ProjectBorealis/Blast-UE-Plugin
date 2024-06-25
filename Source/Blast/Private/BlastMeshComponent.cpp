@@ -1599,7 +1599,10 @@ void UBlastMeshComponent::BeginPlay()
 void UBlastMeshComponent::CreateRenderState_Concurrent(FRegisterComponentContext* Context)
 {
 	Super::CreateRenderState_Concurrent(Context);
-	auto MeshResource = (ShouldRender() && GetSkinnedAsset()) ? GetSkinnedAsset()->GetResourceForRendering() : nullptr;
+	
+	FRegisterComponentContext::SendRenderDynamicData(Context, this);
+	
+	/*auto MeshResource = (ShouldRender() && GetSkinnedAsset()) ? GetSkinnedAsset()->GetResourceForRendering() : nullptr;
 	if (MeshResource)
 	{
 		//Need to update it next draw if only the renderstate is recreated, and we are not re-registered
@@ -1609,7 +1612,7 @@ void UBlastMeshComponent::CreateRenderState_Concurrent(FRegisterComponentContext
 		//Force a refresh
 		bAddedOrRemovedActorSinceLastRefresh = true;
 		bHasValidBoneTransform = false;
-	}
+	}*/
 }
 
 void UBlastMeshComponent::DestroyRenderState_Concurrent()
@@ -2786,7 +2789,7 @@ bool UBlastMeshComponent::GetSupportChunksInVolumes(const TArray<ABlastGlueVolum
 		int32 BodySetupIndex = PhysicsAsset->FindBodyIndex(GetSkinnedAsset()->GetRefSkeleton().GetBoneName(BoneIndex));
 		if (BodySetupIndex != INDEX_NONE)
 		{
-			UBodySetup* PhysicsAssetBodySetup = PhysicsAsset->SkeletalBodySetups[BodySetupIndex];
+			USkeletalBodySetup* PhysicsAssetBodySetup = PhysicsAsset->SkeletalBodySetups[BodySetupIndex];
 			FTransform BodyXForm = GetBoneTransform(BoneIndex);
 			for (FKConvexElem& convex : PhysicsAssetBodySetup->AggGeom.ConvexElems)
 			{
@@ -3364,18 +3367,28 @@ const FName UBlastMeshComponent::ActorBaseName("Actor");
 
 FPrimitiveSceneProxy* UBlastMeshComponent::CreateSceneProxy()
 {
+	LLM_SCOPE(ELLMTag::SkeletalMesh);
 	ERHIFeatureLevel::Type SceneFeatureLevel = GetWorld()->GetFeatureLevel();
 	FBlastMeshSceneProxy* Result = nullptr;
 	FSkeletalMeshRenderData* SkelMeshRenderData = GetSkeletalMeshRenderData();
 
-	if (ShouldRender() && SkelMeshRenderData &&
+	if (CheckPSOPrecachingAndBoostPriority() && GetPSOPrecacheProxyCreationStrategy() == EPSOPrecacheProxyCreationStrategy::DelayUntilPSOPrecached)
+	{
+		UE_LOG(LogBlast, Verbose, TEXT("Skipping CreateSceneProxy for UBlastMeshComponent %s (UBlastMeshComponent PSOs are still compiling)"), *GetFullName());
+		return nullptr;
+	}
+
+	// Only create a scene proxy for rendering if properly initialized
+	if (SkelMeshRenderData &&
 		SkelMeshRenderData->LODRenderData.IsValidIndex(GetPredictedLODLevel()) &&
 		!bHideSkin &&
 		MeshObject)
 	{
 		// Only create a scene proxy if the bone count being used is supported, or if we don't have a skeleton (this is the case with destructibles)
-		int32 MaxBonesPerChunk = SkelMeshRenderData->GetMaxBonesPerSection();
-		if (MaxBonesPerChunk <= FGPUBaseSkinVertexFactory::GetMaxGPUSkinBones())
+		int32 MinLODIndex = ComputeMinLOD();
+		int32 MaxBonesPerChunk = SkelMeshRenderData->GetMaxBonesPerSection(MinLODIndex);
+		int32 MaxSupportedNumBones = MeshObject->IsCPUSkinned() ? MAX_int32 : FGPUBaseSkinVertexFactory::GetMaxGPUSkinBones();
+		if (MaxBonesPerChunk <= MaxSupportedNumBones)
 		{
 			Result = ::new FBlastMeshSceneProxy(this, SkelMeshRenderData);
 		}
@@ -3384,6 +3397,7 @@ FPrimitiveSceneProxy* UBlastMeshComponent::CreateSceneProxy()
 #if !(UE_BUILD_SHIPPING || UE_BUILD_TEST)
 	SendRenderDebugPhysics(Result);
 #endif
+
 	BlastProxy = Result;
 	return Result;
 }
@@ -3395,8 +3409,7 @@ FBlastMeshSceneProxy::FBlastMeshSceneProxy(const UBlastMeshComponent* Component,
 {
 	PhysicsAssetForDebug = Component->GetBlastMesh()->PhysicsAsset;
 
-	const UBlastMeshComponent* BlastMeshComponent = Cast<const UBlastMeshComponent>(Component);
-	if (BlastMeshComponent && BlastMeshComponent->bPerBoneMotionBlur)
+	if (Component && Component->bPerBoneMotionBlur)
 	{
 		bAlwaysHasVelocity = true;
 	}
