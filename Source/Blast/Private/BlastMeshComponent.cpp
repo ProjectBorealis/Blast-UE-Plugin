@@ -1039,24 +1039,8 @@ void UBlastMeshComponent::RefreshBoneTransforms(FActorComponentTickFunction* Tic
 
 	bool bBodiesMoved = SyncChunksAndBodies();
 
-	if (bBodiesMoved || !bHasValidBoneTransform || bAddedOrRemovedActorSinceLastRefresh)
+	if (bBodiesMoved || !bHasValidBoneTransform || bChunkVisibilityChanged || bAddedOrRemovedActorSinceLastRefresh)
 	{
-		/*
-		 * Rebuild chunk visibility only if it changed, otherwise we can push crap data into the bone visibility buffer (because RebuildChunkVisibility sets bBoneVisibilityDirty=true)
-		 * When the buffers are eventually flipped (eg. in FinalizeBoneTransform()) the bone visibility is 'commited' with old non-updated data instead
-		 * The bad values persist because as far as blast is concerned, nothing has changed, so new data never makes it into the bone visibility array, because that is preceded by this call
-		 * TLDR: You MUST check this before rebuilding chunk visibility (with the exception maybe being the initialization step)
-		*/
-		if (bChunkVisibilityChanged && BlastMesh)
-		{
-			RebuildChunkVisibility();
-			// Clean motion vector only if we're using per bone motion blur
-			if (bPerBoneMotionBlur)
-			{
-				ClearMotionVector();
-			}
-		}
-
 		// Flip bone buffer and send 'post anim' notification
 		FinalizeBoneTransform();
 
@@ -1302,6 +1286,15 @@ bool UBlastMeshComponent::HasValidPhysicsState() const
 
 void UBlastMeshComponent::OnRegister()
 {
+	if (BlastMesh == nullptr)
+	{
+		SetSkinnedAsset(nullptr);
+	}
+	else
+	{
+		SetSkinnedAsset(BlastMesh->Mesh);
+	}
+	
 	Super::OnRegister();
 
 	ConditionalUpdateComponentToWorld();
@@ -1325,14 +1318,8 @@ void UBlastMeshComponent::OnRegister()
 
 	ChunkVisibility.Reset();
 	ChunkToActorIndex.Reset();
-	if (BlastMesh == nullptr)
+	if (BlastMesh)
 	{
-		SetSkinnedAsset(nullptr);
-	}
-	else
-	{
-		SetSkinnedAsset(BlastMesh->Mesh);
-
 		ChunkVisibility.Init(false, BlastMesh->GetChunkCount());
 		ChunkToActorIndex.SetNumUninitialized(BlastMesh->GetChunkCount());
 		for (int32 C = 0; C < ChunkToActorIndex.Num(); C++)
@@ -1601,18 +1588,6 @@ void UBlastMeshComponent::CreateRenderState_Concurrent(FRegisterComponentContext
 	Super::CreateRenderState_Concurrent(Context);
 	
 	FRegisterComponentContext::SendRenderDynamicData(Context, this);
-	
-	/*auto MeshResource = (ShouldRender() && GetSkinnedAsset()) ? GetSkinnedAsset()->GetResourceForRendering() : nullptr;
-	if (MeshResource)
-	{
-		//Need to update it next draw if only the renderstate is recreated, and we are not re-registered
-		//Can't call MarkRenderDynamicDataDirty(); since we could already be in an End-of-frame update
-		RebuildChunkVisibility();
-
-		//Force a refresh
-		bAddedOrRemovedActorSinceLastRefresh = true;
-		bHasValidBoneTransform = false;
-	}*/
 }
 
 void UBlastMeshComponent::DestroyRenderState_Concurrent()
@@ -1624,12 +1599,6 @@ void UBlastMeshComponent::DestroyRenderState_Concurrent()
 
 void UBlastMeshComponent::SendRenderDynamicData_Concurrent()
 {
-	//Must be done before calling the base class if using bone visibility since that updates the mesh object
-	if (bChunkVisibilityChanged && BlastMesh)
-	{
-		RebuildChunkVisibility();
-	}
-
 #if WITH_EDITOR
 	//Need to check SceneProxy since we don't know when to set BlastProxy to null
 	if (BlastProxy && SceneProxy)
@@ -1644,6 +1613,27 @@ void UBlastMeshComponent::SendRenderDynamicData_Concurrent()
 #endif
 
 	Super::SendRenderDynamicData_Concurrent();
+}
+
+void UBlastMeshComponent::FinalizeBoneTransform()
+{
+	/*
+	 * Rebuild chunk visibility only if it changed, otherwise we can push crap data into the bone visibility buffer (because RebuildChunkVisibility sets bBoneVisibilityDirty=true)
+	 * When the buffers are eventually flipped (eg. in FinalizeBoneTransform()) the bone visibility is 'commited' with old non-updated data instead
+	 * The bad values persist because as far as blast is concerned, nothing has changed, so new data never makes it into the bone visibility array, because that is preceded by this call
+	 * TLDR: You MUST check this before rebuilding chunk visibility (with the exception maybe being the initialization step)
+	*/
+	if (bChunkVisibilityChanged && BlastMesh)
+	{
+		RebuildChunkVisibility();
+		// Clean motion vector only if we're using per bone motion blur
+		if (bPerBoneMotionBlur)
+		{
+			ClearMotionVector();
+		}
+	}
+	
+	Super::FinalizeBoneTransform();
 }
 
 void UBlastMeshComponent::SetBlastMesh(UBlastMesh* NewBlastMesh)

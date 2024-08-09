@@ -653,6 +653,8 @@ public:
 	virtual void DestroyRenderState_Concurrent() override;
 	virtual void SendRenderDynamicData_Concurrent() override;
 
+	virtual void FinalizeBoneTransform() override;
+
 	virtual bool IsSimulatingPhysics(FName BoneName = NAME_None) const override;
 
 	virtual void AddRadialImpulse(FVector Origin, float Radius, float Strength, enum ERadialImpulseFalloff Falloff, bool bVelChange = false) override;
