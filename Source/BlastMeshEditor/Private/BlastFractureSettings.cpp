@@ -207,12 +207,31 @@ UBlastRebuildCollisionMeshProperties::UBlastRebuildCollisionMeshProperties(const
 }
 
 //////////////////////////////////////////////////////////////////////////
+// UBlastStaticMeshCopyCollisionProperties
+//////////////////////////////////////////////////////////////////////////
+
+UBlastStaticMeshCopyCollisionProperties::UBlastStaticMeshCopyCollisionProperties(const FObjectInitializer& ObjectInitializer)
+	: Super(ObjectInitializer)
+{
+}
+
+//////////////////////////////////////////////////////////////////////////
 // UBlastStaticMeshHolder
 //////////////////////////////////////////////////////////////////////////
 
 UBlastStaticMeshHolder::UBlastStaticMeshHolder(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
+}
+
+void UBlastStaticMeshCopyCollisionProperties::PostEditChangeProperty(FPropertyChangedEvent& e)
+{
+	Super::PostEditChangeProperty(e);
+	FName PropertyName = (e.Property != NULL) ? e.Property->GetFName() : NAME_None;
+	if (PropertyName == GET_MEMBER_NAME_CHECKED(UBlastStaticMeshCopyCollisionProperties, StaticMesh) && StaticMesh != nullptr)
+	{
+		OnStaticMeshSelected.ExecuteIfBound();
+	}
 }
 
 void UBlastStaticMeshHolder::PostEditChangeProperty(struct FPropertyChangedEvent& e)

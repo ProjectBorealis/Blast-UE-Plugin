@@ -423,6 +423,12 @@ void FBlastMeshEditor::BindCommands()
 		FIsActionChecked());
 
 	UICommandList->MapAction(
+		Commands.CopyCollisionMeshToChunk,
+		FExecuteAction::CreateSP(this, &FBlastMeshEditor::CopyCollisionMeshToChunk),
+		FCanExecuteAction::CreateSP(this, &FBlastMeshEditor::IsFractured),
+		FIsActionChecked());
+
+	UICommandList->MapAction(
 		Commands.ImportRootFromStaticMesh,
 		FExecuteAction::CreateSP(this, &FBlastMeshEditor::ImportRootFromStaticMesh),
 		FCanExecuteAction::CreateSP(this, &FBlastMeshEditor::CanImportRootFromStaticMesh),
@@ -459,6 +465,7 @@ void FillCommandToolbar(FToolBarBuilder& ToolbarBuilder, TSharedRef<SWidget> Pre
 		ToolbarBuilder.AddToolBarButton(FBlastMeshEditorCommands::Get().FitUvCoordinates);
 		ToolbarBuilder.AddToolBarButton(FBlastMeshEditorCommands::Get().ChunksFromIslands);
 		ToolbarBuilder.AddToolBarButton(FBlastMeshEditorCommands::Get().RebuildCollisionMesh);
+		ToolbarBuilder.AddToolBarButton(FBlastMeshEditorCommands::Get().CopyCollisionMeshToChunk);
 		ToolbarBuilder.AddToolBarButton(FBlastMeshEditorCommands::Get().ExportAssetToFile);
 
 		ToolbarBuilder.AddWidget(PreviewBox);
@@ -1047,6 +1054,14 @@ void FBlastMeshEditor::SplitIslandsToChunks()
 void FBlastMeshEditor::RebuildCollisionMesh()
 {
 	if (SRebuildCollisionMeshDialog::ShowWindow(Fracturer, FractureSettings, SelectedChunkIndices))
+	{
+		//OnBlastMeshReloaded();
+	}
+}
+
+void FBlastMeshEditor::CopyCollisionMeshToChunk()
+{
+	if (SCopyCollisionMeshToChunkDialog::ShowWindow(BlastMesh, SelectedChunkIndices))
 	{
 		//OnBlastMeshReloaded();
 	}

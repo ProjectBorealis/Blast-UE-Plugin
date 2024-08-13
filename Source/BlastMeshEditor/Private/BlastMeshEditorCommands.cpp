@@ -28,6 +28,7 @@ void FBlastMeshEditorCommands::RegisterCommands()
 	UI_COMMAND(FitUvCoordinates, "FitUVs", "Fit uv coordinates to given square.", EUserInterfaceActionType::Button, FInputChord());
 	UI_COMMAND(ChunksFromIslands, "Islands to chunks", "Converts islands to separate chunks.", EUserInterfaceActionType::Button, FInputChord());
 	UI_COMMAND(RebuildCollisionMesh, "Collision", "Rebuild collision mesh.", EUserInterfaceActionType::Button, FInputChord());
+	UI_COMMAND(CopyCollisionMeshToChunk, "Copy collision to chunk", "Copy a static mesh's collision and assign it to the selected chunk.", EUserInterfaceActionType::Button, FInputChord());
 	UI_COMMAND(ExportAssetToFile, "Export", "Export asset to a file.", EUserInterfaceActionType::Button, FInputChord());
 
 	UI_COMMAND(ToggleFractureVisualization, "Fracture visualization", "Show fracture method specific visualization.", EUserInterfaceActionType::ToggleButton, FInputChord(EModifierKey::Control, EKeys::V));

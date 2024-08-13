@@ -152,6 +152,37 @@ public:
 	bool IsRebuild = false;
 };
 
+//////////////////////////////////////////////////////////////////////////
+// SCopyCollisionMeshToChunkDialog
+//////////////////////////////////////////////////////////////////////////
+
+class SCopyCollisionMeshToChunkDialog : public SCompoundWidget
+{
+public:
+	SLATE_BEGIN_ARGS(SCopyCollisionMeshToChunkDialog)
+	{
+	}
+
+	SLATE_END_ARGS()
+
+	// Constructs this widget with InArgs
+	void Construct(const FArguments& InArgs);
+
+	FReply OnClicked(bool Cancel);
+
+	// Show the dialog, returns true if successfully edited fracture script
+	static bool ShowWindow(UBlastMesh* Mesh, TSet<int32>& ChunkIndices);
+
+	void CloseContainingWindow();
+
+	void MeshSelected();
+
+	TSharedPtr<IDetailsView> PropertyView;
+	TSharedPtr<SButton> CopyButton;
+	TObjectPtr<class UBlastStaticMeshCopyCollisionProperties> Properties;
+	bool bActionCancelled = true;
+};
+
 
 ////////////////////////////////////////////////////////////////////////////
 //// SUVCoordinatesDialog

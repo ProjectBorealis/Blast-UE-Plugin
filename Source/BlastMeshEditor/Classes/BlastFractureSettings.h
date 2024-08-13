@@ -268,6 +268,19 @@ class UBlastRebuildCollisionMeshProperties : public UObject
 DECLARE_DELEGATE(FOnStaticMeshSelected);
 
 UCLASS()
+class UBlastStaticMeshCopyCollisionProperties : public UObject
+{
+	GENERATED_UCLASS_BODY()
+
+	UPROPERTY(EditAnywhere, Category = Import, Transient)
+	TObjectPtr<class UStaticMesh> StaticMesh;
+
+	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& e) override;
+
+	FOnStaticMeshSelected OnStaticMeshSelected;
+};
+
+UCLASS()
 class UBlastStaticMeshHolder : public UObject
 {
 	GENERATED_UCLASS_BODY()

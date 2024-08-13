@@ -22,6 +22,7 @@
 #include "NvBlastExtAuthoring.h"
 #include "NvBlastExtSerialization.h"
 #include "NvBlastExtLlSerialization.h"
+#include "PhysicsEngine/PhysicsAsset.h"
 
 
 //////////////////////////////////////////////////////////////////////////
@@ -65,7 +66,7 @@ void SSelectStaticMeshDialog::Construct(const FArguments& InArgs)
 				[
 					SAssignNew(LoadButton, SButton)
 										.Text(FText::FromString("Load"))
-										.IsEnabled(false)
+										.IsEnabled(StaticMeshHolder->StaticMesh != nullptr)
 										.OnClicked(this, &SSelectStaticMeshDialog::LoadClicked)
 				]
 				+ SUniformGridPanel::Slot(1, 0)
@@ -574,4 +575,129 @@ bool SRebuildCollisionMeshDialog::ShowWindow(TSharedPtr<FBlastFracture> Fracture
 			                                : TSet<int32>());
 	}
 	return RebuildCollisionMeshDialog->IsRebuild;
+}
+
+//////////////////////////////////////////////////////////////////////////
+// SCopyCollisionMeshToChunkDialog
+//////////////////////////////////////////////////////////////////////////
+
+void SCopyCollisionMeshToChunkDialog::Construct(const FArguments& InArgs)
+{
+	FDetailsViewArgs Args;
+	Args.bLockable = false;
+	Args.bHideSelectionTip = true;
+	FPropertyEditorModule& PropertyModule = FModuleManager::LoadModuleChecked<FPropertyEditorModule>("PropertyEditor");
+	Properties = NewObject<UBlastStaticMeshCopyCollisionProperties>();
+	Properties->OnStaticMeshSelected.BindSP(this, &SCopyCollisionMeshToChunkDialog::MeshSelected);
+	PropertyView = PropertyModule.CreateDetailView(Args);
+	PropertyView->SetObject(Properties);
+	ChildSlot
+	[
+		SNew(SBorder)
+		.Padding(FMargin(0.0f, 3.0f, 1.0f, 0.0f))
+		[
+			SNew(SVerticalBox)
+
+			+ SVerticalBox::Slot()
+			  .Padding(2.0f)
+			  .AutoHeight()
+			[
+				PropertyView->AsShared()
+			]
+
+			+ SVerticalBox::Slot()
+			  .Padding(2.0f)
+			  .HAlign(HAlign_Right)
+			  .AutoHeight()
+			[
+				SNew(SUniformGridPanel)
+				.SlotPadding(2)
+				+ SUniformGridPanel::Slot(0, 0)
+				[
+					SAssignNew(CopyButton, SButton)
+										.Text(FText::FromString("Copy"))
+										.IsEnabled(false)
+										.OnClicked(this, &SCopyCollisionMeshToChunkDialog::OnClicked, false)
+				]
+				+ SUniformGridPanel::Slot(1, 0)
+				[
+					SNew(SButton)
+										.Text(FText::FromString("Cancel"))
+										.OnClicked(this, &SCopyCollisionMeshToChunkDialog::OnClicked, true)
+				]
+			]
+		]
+	];
+}
+
+void SCopyCollisionMeshToChunkDialog::MeshSelected()
+{
+	CopyButton->SetEnabled(Properties->StaticMesh != nullptr);
+}
+
+FReply SCopyCollisionMeshToChunkDialog::OnClicked(bool Cancel)
+{
+	bActionCancelled = Cancel;
+	CloseContainingWindow();
+	return FReply::Handled();
+}
+
+void SCopyCollisionMeshToChunkDialog::CloseContainingWindow()
+{
+	TSharedPtr<SWindow> ContainingWindow = FSlateApplication::Get().FindWidgetWindow(AsShared());
+	if (ContainingWindow.IsValid())
+	{
+		ContainingWindow->RequestDestroyWindow();
+	}
+}
+
+bool SCopyCollisionMeshToChunkDialog::ShowWindow(UBlastMesh* Mesh, TSet<int32>& ChunkIndices)
+{
+	const FText TitleText = NSLOCTEXT("BlastMeshEditor", "BlastMeshEditor_CopyCollisionMeshToChunk",
+									  "Copy collision mesh to chunk");
+	// Create the window to pick the class
+	TSharedRef<SWindow> CopyCollisionMeshWindow = SNew(SWindow)
+		.Title(TitleText)
+		.SizingRule(ESizingRule::Autosized)
+		.AutoCenter(EAutoCenter::PreferredWorkArea)
+		.SupportsMinimize(false);
+
+	TSharedRef<SCopyCollisionMeshToChunkDialog> RebuildCollisionMeshDialog = SNew(SCopyCollisionMeshToChunkDialog);
+	CopyCollisionMeshWindow->SetContent(RebuildCollisionMeshDialog);
+	TSharedPtr<SWindow> RootWindow = FGlobalTabmanager::Get()->GetRootWindow();
+	if (RootWindow.IsValid())
+	{
+		FSlateApplication::Get().AddModalWindow(CopyCollisionMeshWindow, RootWindow.ToSharedRef());
+	}
+	else
+	{
+		//assert here?
+		return false;
+	}
+	
+	if (RebuildCollisionMeshDialog->bActionCancelled || !Mesh || !Mesh->PhysicsAsset || !RebuildCollisionMeshDialog->Properties->StaticMesh)
+	{
+		return false;
+	}
+	
+	for (const int32 Chunk : ChunkIndices)
+	{
+		if (!Mesh->ChunkIndexToBoneName.IsValidIndex(Chunk))
+		{
+			continue;
+		}
+		
+		int32 BodyIndex = Mesh->PhysicsAsset->FindBodyIndex(Mesh->ChunkIndexToBoneName[Chunk]);
+		if (BodyIndex == INDEX_NONE)
+		{
+			continue;
+		}
+		
+		USkeletalBodySetup* bs = Mesh->PhysicsAsset->SkeletalBodySetups[BodyIndex];
+		bs->RemoveSimpleCollision();
+		bs->AddCollisionFrom(RebuildCollisionMeshDialog->Properties->StaticMesh->GetBodySetup());
+		bs->CreatePhysicsMeshes();
+	}
+
+	return true;
 }

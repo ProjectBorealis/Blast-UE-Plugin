@@ -26,6 +26,7 @@ public:
 	TSharedPtr< FUICommandInfo > FitUvCoordinates;
 	TSharedPtr< FUICommandInfo > ChunksFromIslands;
 	TSharedPtr< FUICommandInfo > RebuildCollisionMesh;
+	TSharedPtr< FUICommandInfo > CopyCollisionMeshToChunk;
 	
 	TSharedPtr< FUICommandInfo > ToggleFractureVisualization;
 	TSharedPtr< FUICommandInfo > ToggleAABBView;

@@ -148,6 +148,8 @@ private:
 	void ExportAssetToFile();
 	/** Callback for rebuilding collision mesh. It might be very expensive if user used VHACD for collision decomposition. */
 	void RebuildCollisionMesh();
+	/** Callback for rebuilding collision mesh. It might be very expensive if user used VHACD for collision decomposition. */
+	void CopyCollisionMeshToChunk();
 
 private:
 	
