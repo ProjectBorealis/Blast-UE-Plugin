@@ -1458,12 +1458,11 @@ bool FBlastEditorModule::BuildExtendedSupport(ABlastExtendedSupportStructure* Ex
 	LODModel.NumTexCoords = 1;
 
 	SkeletalMesh->ResetLODInfo();
-	SkeletalMesh->AddLODInfo();
-	TArray<FSkeletalMeshLODInfo>& lodInfo = SkeletalMesh->GetLODInfoArray();
+	FSkeletalMeshLODInfo& lodInfo = SkeletalMesh->AddLODInfo();
 
-	lodInfo[0].LODHysteresis = 0.02f;
+	lodInfo.LODHysteresis = 0.02f;
 	FSkeletalMeshOptimizationSettings Settings;
-	lodInfo[0].ReductionSettings = Settings;
+	lodInfo.ReductionSettings = Settings;
 
 	SkeletalMesh->CalculateInvRefMatrices();
 	SkeletalMesh->PostEditChange();

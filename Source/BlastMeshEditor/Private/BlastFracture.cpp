@@ -318,9 +318,6 @@ TSharedPtr<FFractureSession> FBlastFracture::StartFractureSession(UBlastMesh* In
 			FStaticMeshOperations::ConvertToRawMesh(*InSourceStaticMesh->GetMeshDescription(0), InSourceRawMesh,
 			                                        MaterialMap);
 
-			BuildSmoothingGroups(InSourceRawMesh);
-			//Retrieve mesh just assign default smoothing group 1 for each face. So we need to generate it.
-
 			Mesh = CreateAuthoringMeshFromRawMesh(InSourceRawMesh, UE4ToBlastTransform);
 		}
 

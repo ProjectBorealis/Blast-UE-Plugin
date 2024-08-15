@@ -25,8 +25,6 @@ namespace Nv
 	}
 }
 
-void BuildSmoothingGroups(FRawMesh& RawMesh);
-
 Nv::Blast::Mesh* CreateAuthoringMeshFromRawMesh(const FRawMesh& RawMesh, const FTransform3f& UE4ToBlastTransform);
 
 Nv::Blast::Mesh* CreateAuthoringMeshFromRenderData(const FStaticMeshRenderData& RenderData,

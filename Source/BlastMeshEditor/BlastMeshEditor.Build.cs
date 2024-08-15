@@ -53,6 +53,7 @@ namespace UnrealBuildTool.Rules
                 "StaticMeshDescription",
                 "MeshDescriptionOperations",
                 "RHI",
+                "SkeletalMeshUtilitiesCommon",
                 }
             );
 
