@@ -1,15 +1,6 @@
 // Copyright 1998-2017 Epic Games, Inc. All Rights Reserved.
 
 #include "BlastMeshUtilities.h"
-#include "BlastFracture.h"
-#include "BlastMesh.h"
-#include "BlastMeshFactory.h"
-#include "BlastGlobals.h"
-
-#include "NvBlastExtAuthoring.h"
-#include "NvBlastExtAuthoringTypes.h"
-#include "NvBlastExtAuthoringMesh.h"
-#include "NvBlastExtAuthoringFractureTool.h"
 
 #include "Modules/ModuleManager.h"
 #include "RawIndexBuffer.h"
@@ -29,7 +20,6 @@
 #include "Runtime/Core/Public/Misc/FeedbackContext.h"
 #include "RawMesh.h"
 #include "Rendering/SkeletalMeshLODModel.h"
-#include "Rendering/SkeletalMeshRenderData.h"
 #include "Rendering/SkeletalMeshModel.h"
 #include "OverlappingCorners.h"
 #include "StaticMeshAttributes.h"
@@ -38,6 +28,16 @@
 #include "Interfaces/ITargetPlatform.h"
 #include "Interfaces/ITargetPlatformManagerModule.h"
 #include "Misc/CoreMisc.h"
+
+#include "BlastFracture.h"
+#include "BlastMesh.h"
+#include "BlastMeshFactory.h"
+#include "BlastGlobals.h"
+
+#include "NvBlastExtAuthoringTypes.h"
+#include "NvBlastExtAuthoringMesh.h"
+#include "blast-sdk/extensions/authoring/NvBlastExtAuthoring.h"
+#include "blast-sdk/extensions/authoring/NvBlastExtAuthoringFractureTool.h"
 
 #define LOCTEXT_NAMESPACE "BlastMeshEditor"
 

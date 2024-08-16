@@ -5,8 +5,6 @@
 
 #include "BlastAsset.generated.h"
 
-struct NvBlastAsset;
-
 UENUM()
 enum class EBlastAssetChunkFlags : uint8
 {
@@ -84,12 +82,12 @@ struct FBlastFractureHistory
 		return ToolDataHistory[Curr];
 	}
 
-	TSharedPtr<NvBlastAsset>& GetCurrentLoadedAsset()
+	TSharedPtr<struct NvBlastAsset>& GetCurrentLoadedAsset()
 	{
 		return LoadedAssetHistory[Curr];
 	}
 
-	const TSharedPtr<NvBlastAsset>& GetCurrentLoadedAsset() const
+	const TSharedPtr<struct NvBlastAsset>& GetCurrentLoadedAsset() const
 	{
 		return LoadedAssetHistory[Curr];
 	}

@@ -27,6 +27,7 @@
 
 
 #include "BlastMeshExporterFbxWriter.h"
+
 #include "fbxsdk.h"
 #include <iostream>
 #include <sstream>
@@ -34,14 +35,13 @@
 #include <map>
 #include <algorithm>
 #include <set>
+#include <functional>
+
+#include "BlastMeshExporterFbxUtils.h"
+
 #include "NvBlastTypes.h"
 #include "NvBlastGlobals.h"
 #include "NvBlast.h"
-#include <unordered_set>
-#include <functional>
-#include "BlastMeshExporterFbxUtils.h"
-#include "NvBlastExtAuthoringConvexMeshBuilder.h"
-#include "NvBlastExtAuthoring.h"
 #include "NvBlastExtAuthoringMesh.h"
 
 using namespace Nv::Blast;

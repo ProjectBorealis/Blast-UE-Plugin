@@ -3,8 +3,9 @@
 #include "CoreMinimal.h"
 #include "Factories/Factory.h"
 #include "EditorReimportHandler.h"
+#include "FbxImporter.h"
 
-#include "NvBlastExtAuthoringTypes.h"
+#include "blast-sdk/extensions/authoringCommon/NvBlastExtAuthoringTypes.h"
 
 #include "BlastMeshFactory.generated.h"
 
@@ -50,17 +51,20 @@ public:
 	BLASTEDITOR_API static FTransform3f GetTransformBlastToUE4CoordinateSystem(class UFbxSkeletalMeshImportData* SkeletalMeshImportData);
 	BLASTEDITOR_API static void TransformBlastAssetFromUE4ToBlastCoordinateSystem(struct NvBlastAsset* asset, class UFbxSkeletalMeshImportData* SkeletalMeshImportData);
 	BLASTEDITOR_API static void TransformBlastAssetToUE4CoordinateSystem(struct NvBlastAsset* asset, class UFbxSkeletalMeshImportData* SkeletalMeshImportData);
-	BLASTEDITOR_API static USkeletalMesh* ImportSkeletalMesh(UBlastMesh* BlastMesh, FName skelMeshName,
-		FString path, bool bImportCollisionData, class UFbxImportUI* FBXImportUI,
-		FFeedbackContext* Warn, TMap<FName, TArray<FBlastCollisionHull>>& hulls);
+	BLASTEDITOR_API USkeletalMesh* ImportSkeletalMesh(UBlastMesh* BlastMesh, FName skelMeshName, FFeedbackContext* Warn, TMap<FName, TArray<FBlastCollisionHull>>& hulls);
 	BLASTEDITOR_API static bool RebuildPhysicsAsset(UBlastMesh* BlastMesh, const TMap<FName, TArray<FBlastCollisionHull>>& hulls);
 
 protected:
 
 	UPROPERTY()
 	TObjectPtr<class UBlastImportUI> ImportUI;
+	bool bOperationCanceled = false;
 
 	/* Gets a name with suffix, and any "special" characters fixed. */
 	FName GetNameFromRoot(FName rootName, FString suffix);
 	FString GuessFBXPathFromAsset(const FString& BlastAssetPath);
+
+	FText GetImportTaskText(const FText& TaskText) const;
+
+	void CancelObjectCreation(UnFbx::FFbxImporter* FbxImporter) const;
 };

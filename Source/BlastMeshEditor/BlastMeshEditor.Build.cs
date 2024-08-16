@@ -10,15 +10,11 @@ namespace UnrealBuildTool.Rules
         {
             PrivateIncludePaths.AddRange(
                 new string[] {
-                    Path.GetFullPath(Path.Combine(ModuleDirectory, "../Blast/Public/extensions/assetutils/")),
-                    Path.GetFullPath(Path.Combine(ModuleDirectory, "../Blast/Public/extensions/authoring/")),
-                    Path.GetFullPath(Path.Combine(ModuleDirectory, "../Blast/Public/extensions/authoringCommon/")),
-                    Path.GetFullPath(Path.Combine(ModuleDirectory, "../Blast/Public/extensions/serialization/")),
-                    Path.GetFullPath(Path.Combine(ModuleDirectory, "../Blast/Public/extensions/shaders/")),
-                    Path.GetFullPath(Path.Combine(ModuleDirectory, "../Blast/Public/extensions/stress/")),
-                    Path.GetFullPath(Path.Combine(ModuleDirectory, "../Blast/Public/shared/NvFoundation/")),
-                    Path.GetFullPath(Path.Combine(ModuleDirectory, "../Blast/Public/globals/")),
-                    Path.GetFullPath(Path.Combine(ModuleDirectory, "../Blast/Public/lowlevel/")),
+                    Path.GetFullPath(Path.Combine(PluginDirectory, "Libraries", "include")),
+                    Path.GetFullPath(Path.Combine(PluginDirectory, "Libraries", "include", "blast-sdk", "lowlevel")),
+                    Path.GetFullPath(Path.Combine(PluginDirectory, "Libraries", "include", "blast-sdk", "globals")),
+                    Path.GetFullPath(Path.Combine(PluginDirectory, "Libraries", "include", "blast-sdk", "extensions", "authoringCommon")),
+                    Path.GetFullPath(Path.Combine(PluginDirectory, "Libraries", "include", "blast-sdk", "shared", "NvFoundation"))
                 }
             );
 
@@ -54,6 +50,7 @@ namespace UnrealBuildTool.Rules
                 "MeshDescriptionOperations",
                 "RHI",
                 "SkeletalMeshUtilitiesCommon",
+                "ImageCore",
                 }
             );
 

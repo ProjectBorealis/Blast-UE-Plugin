@@ -12,24 +12,9 @@
 #include "ComponentReregisterContext.h"
 #include "Animation/Skeleton.h"
 #include "Engine/SkinnedAssetCommon.h"
-
-#include "NvBlastExtAssetUtils.h"
-#include "NvBlastExtAuthoring.h"
-#include "NvBlastGlobals.h"
-#include "NvBlast.h"
-
-#include "BlastGlobals.h"
-#include "BlastGlueVolume.h"
-#include "BlastExtendedSupport.h"
-#include "BlastUICommands.h"
-#include "BlastMeshThumbnailRenderer.h"
-#include "BlastMeshComponentDetails.h"
-#include "BlastMeshComponent.h"
-#include "BlastMeshFactory.h"
 #include "AssetTypeActions_BlastMesh.h"
 #include "Framework/MultiBox/MultiBoxBuilder.h"
 #include "Editor.h"
-#include "BlastMeshActor.h"
 #include "Widgets/Input/SNumericEntryBox.h"
 #include "Widgets/Layout/SUniformGridPanel.h"
 #include "Widgets/Input/SButton.h"
@@ -39,9 +24,23 @@
 #include "Misc/PackageName.h"
 #include "Widgets/Input/SCheckBox.h"
 #include "GPUSkinVertexFactory.h"
-
 #include "Rendering/SkeletalMeshRenderData.h"
 #include "Rendering/SkeletalMeshModel.h"
+
+#include "BlastGlobals.h"
+#include "BlastGlueVolume.h"
+#include "BlastExtendedSupport.h"
+#include "BlastUICommands.h"
+#include "BlastMeshThumbnailRenderer.h"
+#include "BlastMeshComponentDetails.h"
+#include "BlastMeshComponent.h"
+#include "BlastMeshFactory.h"
+#include "BlastMeshActor.h"
+
+#include "blast-sdk/extensions/assetutils/NvBlastExtAssetUtils.h"
+#include "blast-sdk/extensions/authoring/NvBlastExtAuthoring.h"
+#include "NvBlastGlobals.h"
+#include "NvBlast.h"
 
 IMPLEMENT_MODULE(FBlastEditorModule, BlastEditor);
 DEFINE_LOG_CATEGORY(LogBlastEditor);

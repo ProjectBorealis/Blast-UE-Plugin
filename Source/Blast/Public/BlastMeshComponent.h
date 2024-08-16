@@ -8,8 +8,6 @@
 #include "ComponentInstanceDataCache.h"
 #include "SkeletalMeshSceneProxy.h"
 
-#include "NvBlastTypes.h"
-#include "NvBlastExtDamageShaders.h"
 #include "BlastMesh.h"
 #include "BlastAsset.h"
 #include "BlastBaseDamageComponent.h"
@@ -17,8 +15,6 @@
 
 #include "BlastMeshComponent.generated.h"
 
-struct NvBlastActor;
-struct NvBlastFamily;
 class AVolume;
 class ABlastExtendedSupportStructure;
 
@@ -107,6 +103,12 @@ struct FChunkDamageEvent
 	// Chunk centroid in world coordinates
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Blast")
 	FVector WorldCentroid = FVector(ForceInitToZero);
+};
+
+USTRUCT()
+struct FBlastDamageProgram
+{
+	GENERATED_BODY()
 };
 
 // Delagates/Events signatures
@@ -239,7 +241,7 @@ public:
 #endif
 
 	ABlastExtendedSupportStructure* GetOwningSupportStructure() const { return OwningSupportStructure; }
-	NvBlastExtDamageAccelerator* GetAccelerator() const { return DamageAccelerator; }
+	class NvBlastExtDamageAccelerator* GetAccelerator() const { return DamageAccelerator; }
 	int32	GetOwningSupportStructureIndex() const { return OwningSupportStructureIndex; }
 
 	const FBlastMaterial& GetUsedBlastMaterial() const
@@ -495,7 +497,8 @@ public:
 	static EBlastDamageResult ApplyCapsuleDamageAll(FVector Origin, FRotator Rot, float HalfHeight, float MinRadius, float MaxRadius, float Damage = 100.0f, float ImpulseStrength = 0.0f, bool bImpulseVelChange = true);
 
 	/* Directly executes LL Blast damage program. To be used by BlastDamagePrograms. */
-	bool ExecuteBlastDamageProgram(uint32 actorIndex, const NvBlastDamageProgram& program, const NvBlastExtProgramParams& programParams, FName DamageType);
+	bool ExecuteBlastDamageProgram(uint32 actorIndex, const struct NvBlastDamageProgram& program,
+													const struct NvBlastExtProgramParams& programParams, FName DamageType);
 
 
 	///////////////////////////////////////////////////////////////////////////////
@@ -708,7 +711,7 @@ protected:
 	};
 	struct FActorData
 	{
-		NvBlastActor* BlastActor;
+		struct NvBlastActor* BlastActor;
 		FBodyInstance* BodyInstance;
 		FTransform PreviousBodyWorldTransform;
 		TArray<FActorChunkData, TInlineAllocator<1>> Chunks;
@@ -724,17 +727,17 @@ protected:
 	int32								BlastActorsBeginLive, BlastActorsEndLive;
 
 	/* The root "family" of this mesh component. */
-	TSharedPtr<NvBlastFamily>			BlastFamily;
+	TSharedPtr<struct NvBlastFamily>			BlastFamily;
 
 	// Stress solver 
 	Nv::Blast::ExtStressSolver* StressSolver;
 
-	NvBlastExtDamageAccelerator* DamageAccelerator = nullptr;
+	class NvBlastExtDamageAccelerator* DamageAccelerator = nullptr;
 
 	EBlastDamageResult ApplyDamageOnActor(uint32 actorIndex, const FBlastBaseDamageProgram& DamageProgram, const FVector& Origin, const FQuat& Rot, struct FScopedSceneLock_Chaos* SceneLock = nullptr);
 	static EBlastDamageResult ApplyDamageProgramOverlapFiltered(UBlastMeshComponent* mesh, const FBlastBaseDamageProgram& DamageProgram, const FVector& Origin, const FQuat& Rot);
 
-	void ApplyFracture(uint32 actorIndex, const NvBlastFractureBuffers& fractureBuffers, FName DamageType);
+	void ApplyFracture(uint32 actorIndex, const struct NvBlastFractureBuffers& fractureBuffers, FName DamageType);
 
 	struct FBlastActorCreateInfo
 	{
@@ -746,7 +749,8 @@ protected:
 		FBlastActorCreateInfo(const FTransform& Transform_) : Transform(Transform_) {}
 	};
 
-	void SetupNewBlastActor(NvBlastActor* actor, const FBlastActorCreateInfo& CreateInfo, const FBlastBaseDamageProgram* DamageProgram = nullptr, const FBlastBaseDamageProgram::FInput* Input = nullptr, FName DamageType = FName(), bool bIsFirstActor = false);
+	void NotifyStressSolverActorCreated(struct NvBlastActor& BlastActor);
+	void SetupNewBlastActor(struct NvBlastActor* actor, const FBlastActorCreateInfo& CreateInfo, const FBlastBaseDamageProgram* DamageProgram = nullptr, const FBlastBaseDamageProgram::FInput* Input = nullptr, FName DamageType = FName(), bool bIsFirstActor = false);
 	virtual void ShowActorsVisibleChunks(uint32 actorIndex);
 	void BreakDownBlastActor(uint32 actorIndex);
 	virtual void HideActorsVisibleChunks(uint32 actorIndex);
@@ -779,12 +783,17 @@ protected:
 	void DrawDebugPoint(FVector const& Position, float Size, FLinearColor const& PointColor, uint8 DepthPriority = 0);
 #endif
 
+	struct NvBlastActor* CreateFirstActor();
+	bool SerializeActor(NvBlastActor* actor, TArray<uint8>& OutData);
+	NvBlastActor* DeserializeActor(const TArray<uint8>& InData, int32 DataOffset = 0);
+
+	void InitBlastFamilyInternal(NvBlastAsset* LLBlastAsset);
 	void InitBlastFamily();
 	void UninitBlastFamily();
 	void ShowRootChunks();
 	void InitBodyForActor(FActorData& ActorData, uint32 ActorIndex, const FTransform& ParentActorWorldTransform, FPhysScene* PhysScene, bool bIsFirstActor = false);
 
-	bool HandlePostDamage(NvBlastActor* actor, FName DamageType, const FBlastBaseDamageProgram* DamageProgram = nullptr, const FBlastBaseDamageProgram::FInput* Input = nullptr, struct FScopedSceneLock_Chaos* SceneLock = nullptr);
+	bool HandlePostDamage(struct NvBlastActor* actor, FName DamageType, const FBlastBaseDamageProgram* DamageProgram = nullptr, const FBlastBaseDamageProgram::FInput* Input = nullptr, struct FScopedSceneLock_Chaos* SceneLock = nullptr);
 	void FillInitialComponentSpaceTransformsFromMesh();
 
 	void RebuildChunkVisibility();

@@ -1,6 +1,8 @@
 #include "BlastRadialDamageComponent.h"
-#include "NvBlastExtDamageShaders.h"
+
 #include "BlastMeshComponent.h"
+
+#include "blast-sdk/extensions/shaders/NvBlastExtDamageShaders.h"
 
 #include "GameFramework/Actor.h"
 

@@ -4,9 +4,9 @@
 #include "Math/Vector.h"
 #include "WorldCollision.h"
 
-struct NvBlastActor;
+#include "BlastMaterial.h"
+
 struct FBodyInstance;
-struct FBlastMaterial;
 class UBlastMeshComponent;
 
 namespace Nv
@@ -25,7 +25,7 @@ Implement your own on demand, look for examples of default ones like 'BlastRadia
 In order to apply it use UBlastMeshComponent's methods, it can be executed on particular UBlastMeshComponent
 or by overlapping area and applying it on all UBlastMeshComponent touched (@see UBlastMeshComponent::ApplyDamageProgramOverlapAll).
 */
-struct FBlastBaseDamageProgram
+struct BLAST_API FBlastBaseDamageProgram
 {
 public:
 	virtual ~FBlastBaseDamageProgram() = default;

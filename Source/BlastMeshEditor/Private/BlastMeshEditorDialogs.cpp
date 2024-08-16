@@ -19,9 +19,9 @@
 #include "Engine/SkinnedAssetCommon.h"
 
 #include "BlastMeshExporter.h"
-#include "NvBlastExtAuthoring.h"
-#include "NvBlastExtSerialization.h"
-#include "NvBlastExtLlSerialization.h"
+#include "blast-sdk/extensions/authoring/NvBlastExtAuthoring.h"
+#include "blast-sdk/extensions/serialization/NvBlastExtSerialization.h"
+#include "blast-sdk/extensions/serialization/NvBlastExtLlSerialization.h"
 #include "PhysicsEngine/PhysicsAsset.h"
 
 

@@ -1,14 +1,14 @@
 #include "BlastAsset.h"
-#include "NvBlastTypes.h"
-#include "NvBlastExtSerialization.h"
-#include "NvBlastExtLlSerialization.h"
-#include "NvBlastExtAuthoringTypes.h"
-#include "NvBlast.h"
-#include "NvBlastGlobals.h"
 
 #include "Misc/Guid.h"
 #include "Serialization/CustomVersion.h"
 #include "Containers/Queue.h"
+
+#include "NvBlastTypes.h"
+#include "blast-sdk/extensions/serialization/NvBlastExtSerialization.h"
+#include "blast-sdk/extensions/serialization/NvBlastExtLlSerialization.h"
+#include "NvBlast.h"
+#include "blast-sdk/globals/NvBlastGlobals.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(BlastAsset)
 

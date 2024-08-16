@@ -4,26 +4,28 @@
 #include "TimerManager.h"
 #include "PhysicsEngine/BodySetup.h"
 #include "PhysicsEngine/PhysicsAsset.h"
-#include "NvBlast.h"
-#include "NvBlastTypes.h"
-#include "NvBlastExtDamageShaders.h"
-#include "NvBlastExtStressSolver.h"
 #include "Math/UnrealMathUtility.h"
-#include "BlastGlobals.h"
-#include "NvBlastGlobals.h"
 #include "SkeletalRenderPublic.h"
-#include "BlastScratch.h"
 #include "DrawDebugHelpers.h"
 #include "Stats/Stats.h"
 #include "ComponentReregisterContext.h"
-#include "BlastModule.h"
-#include "BlastDamagePrograms.h"
-#include "BlastGlueVolume.h"
 #include "Logging/MessageLog.h"
 #include "Misc/UObjectToken.h"
 #include "EngineUtils.h"
-#include "BlastExtendedSupport.h"
 #include "Rendering/SkeletalMeshRenderData.h"
+
+#include "BlastGlobals.h"
+#include "BlastExtendedSupport.h"
+#include "BlastScratch.h"
+#include "BlastModule.h"
+#include "BlastDamagePrograms.h"
+#include "BlastGlueVolume.h"
+
+#include "NvBlast.h"
+#include "NvBlastTypes.h"
+#include "blast-sdk/extensions/shaders/NvBlastExtDamageShaders.h"
+#include "blast-sdk/extensions/stress/NvBlastExtStressSolver.h"
+#include "blast-sdk/globals/NvBlastGlobals.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(BlastMeshComponent)
 
@@ -256,6 +258,50 @@ bool UBlastMeshComponent::CanEditChange(const FProperty* InProperty) const
 #endif
 
 
+bool UBlastMeshComponent::SerializeActor(NvBlastActor* actor, TArray<uint8>& OutData)
+{
+	const int32 Offset = OutData.Num();
+	const int32 BufferSize = NvBlastActorGetSerializationSize(actor, Nv::Blast::logLL);
+	OutData.AddUninitialized(BufferSize);
+	return NvBlastActorSerialize(OutData.GetData() + Offset, BufferSize, actor, Nv::Blast::logLL) != 0;
+}
+
+NvBlastActor* UBlastMeshComponent::DeserializeActor(const TArray<uint8>& InData, int32 DataOffset)
+{
+	return NvBlastFamilyDeserializeActor(BlastFamily.Get(), InData.GetData() + DataOffset, Nv::Blast::logLL);
+}
+
+void UBlastMeshComponent::InitBlastFamilyInternal(NvBlastAsset* LLBlastAsset)
+{
+	void* FamilyMem = NVBLAST_ALLOC(NvBlastAssetGetFamilyMemorySize(LLBlastAsset, Nv::Blast::logLL));
+	// Create a NvBlastFamily and wrap it in a shared ptr with a custom deleter so it gets released when we're done with it.
+	BlastFamily = TSharedPtr<NvBlastFamily>(NvBlastAssetCreateFamily(FamilyMem, LLBlastAsset, Nv::Blast::logLL),
+											[FamilyMem](NvBlastFamily* family)
+											{
+												NVBLAST_FREE((void*)FamilyMem);
+											}
+	);
+
+	uint32 MaxActorCount = NvBlastFamilyGetMaxActorCount(BlastFamily.Get(), Nv::Blast::logLL);
+	BlastActors.SetNum(MaxActorCount);
+	ActorBodySetups.Reset();
+	//In some cases due to the editor duplicating objects this can be not empty so make sure it's zeroed out
+	ActorBodySetups.SetNumZeroed(MaxActorCount);
+	BlastActorsBeginLive = 0;
+	BlastActorsEndLive = 0;
+
+	DamageAccelerator = NvBlastExtDamageAcceleratorCreate(LLBlastAsset, 3);
+
+	// Create stress solver if enabled (right after actor created, but before 'StressSolver->notifyActorCreated()' call)
+	if (GetUsedStressProperties().bCalculateStress)
+	{
+		StressSolver = Nv::Blast::ExtStressSolver::create(*BlastFamily.Get());
+		const float density = 0.000001f; // 1e-6 kg / cm3
+		// TODO: set each node according to its mass, volume and local transform with setNodeInfo
+		StressSolver->setAllNodesInfoFromLL(density);
+	}
+}
+
 void UBlastMeshComponent::InitBlastFamily()
 {
 	check(!BlastFamily.IsValid());
@@ -274,66 +320,26 @@ void UBlastMeshComponent::InitBlastFamily()
 		return;
 	}
 
-	UPhysicsAsset* PhysicsAsset = BlastMesh->PhysicsAsset;
 	// hide all chunks at first
 	uint32 ChunkCount = BlastAsset->GetChunkCount();
-	for (uint32 ChunkIndex = 0; ChunkIndex < ChunkCount; ChunkIndex++)
-	{
-		SetChunkVisible(ChunkIndex, false);
-	}
+	ChunkVisibility.Empty();
+	ChunkVisibility.SetNum(ChunkCount, false);
+	bChunkVisibilityChanged = true;
 	DebrisCount = 0;
 
-	void* FamilyMem = NVBLAST_ALLOC(NvBlastAssetGetFamilyMemorySize(LLBlastAsset, Nv::Blast::logLL));
-	// Create a NvBlastFamily and wrap it in a shared ptr with a custom deleter so it gets released when we're done with it.
-	BlastFamily = TSharedPtr<NvBlastFamily>(NvBlastAssetCreateFamily(FamilyMem, LLBlastAsset, Nv::Blast::logLL),
-	                                        [FamilyMem](NvBlastFamily* family)
-	                                        {
-		                                        NVBLAST_FREE((void*)FamilyMem);
-	                                        }
-	);
-
-	uint32 MaxActorCount = NvBlastFamilyGetMaxActorCount(BlastFamily.Get(), Nv::Blast::logLL);
-	BlastActors.SetNum(MaxActorCount);
-	ActorBodySetups.Reset();
-	//In some cases due to the editor duplicating objects this can be not empty so make sure it's zeroed out
-	ActorBodySetups.SetNumZeroed(MaxActorCount);
-	BlastActorsBeginLive = 0;
-	BlastActorsEndLive = 0;
-
-	TArray<uint8> Scratch;
-	Scratch.SetNumUninitialized(
-		NvBlastFamilyGetRequiredScratchForCreateFirstActor(BlastFamily.Get(), Nv::Blast::logLL));
-
-	NvBlastActorDesc ActorDesc;
-	ActorDesc.uniformInitialBondHealth = 1.0f;
-	ActorDesc.uniformInitialLowerSupportChunkHealth = 1.0f;
-	ActorDesc.initialBondHealths = nullptr;
-	ActorDesc.initialSupportChunkHealths = nullptr;
-
-	DamageAccelerator = NvBlastExtDamageAcceleratorCreate(LLBlastAsset, 3);
+	InitBlastFamilyInternal(LLBlastAsset);
 
 #if WITH_EDITOR
 	BlastMesh->RebuildCookedBodySetupsIfRequired();
 #endif
 
-	NvBlastActor* Actor = NvBlastFamilyCreateFirstActor(BlastFamily.Get(), &ActorDesc, Scratch.GetData(),
-	                                                    Nv::Blast::logLL);
-
-	// Create stress solver if enabled (right after actor created, but before 'StressSolver->notifyActorCreated()' call)
-	if (GetUsedStressProperties().bCalculateStress)
-	{
-		StressSolver = Nv::Blast::ExtStressSolver::create(*BlastFamily.Get());
-		const float density = 0.000001f; // 1e-6 kg / cm3
-		// TODO: set each node according to its mass, volume and local transform with setNodeInfo
-		StressSolver->setAllNodesInfoFromLL(density);
-	}
-
-	SetupNewBlastActor(Actor, FBlastActorCreateInfo(GetComponentTransform()), nullptr, nullptr, FName(), true);
+	SetupNewBlastActor(CreateFirstActor(), FBlastActorCreateInfo(GetComponentTransform()), nullptr, nullptr, FName(), true);
 
 	bAddedOrRemovedActorSinceLastRefresh = true;
 	bHasValidBoneTransform = false;
 
 	UpdateFractureBufferSize();
+	MarkRenderDynamicDataDirty();
 }
 
 void UBlastMeshComponent::UninitBlastFamily()
@@ -2453,6 +2459,14 @@ void UBlastMeshComponent::Serialize(FArchive& Ar)
 	SetSkinnedAsset(BlastMesh ? BlastMesh->Mesh : nullptr);
 }
 
+void UBlastMeshComponent::NotifyStressSolverActorCreated(NvBlastActor& BlastActor)
+{
+	if (StressSolver)
+	{
+		StressSolver->notifyActorCreated(BlastActor);
+	}
+}
+
 void UBlastMeshComponent::SetupNewBlastActor(NvBlastActor* actor, const FBlastActorCreateInfo& CreateInfo,
                                              const FBlastBaseDamageProgram* DamageProgram,
                                              const FBlastBaseDamageProgram::FInput* Input, FName DamageType,
@@ -2524,10 +2538,7 @@ void UBlastMeshComponent::SetupNewBlastActor(NvBlastActor* actor, const FBlastAc
 
 	bAddedOrRemovedActorSinceLastRefresh = true;
 
-	if (StressSolver)
-	{
-		StressSolver->notifyActorCreated(*ActorData.BlastActor);
-	}
+	NotifyStressSolverActorCreated(*ActorData.BlastActor);
 
 	if (DamageProgram && Input)
 	{
@@ -3352,6 +3363,18 @@ void UBlastMeshComponent::DrawDebugPoint(FVector const& Position, float Size, FL
 }
 
 #endif
+
+struct NvBlastActor* UBlastMeshComponent::CreateFirstActor()
+{
+	NvBlastActorDesc ActorDesc;
+	ActorDesc.uniformInitialBondHealth = 1.0f;
+	ActorDesc.uniformInitialLowerSupportChunkHealth = 1.0f;
+	ActorDesc.initialBondHealths = nullptr;
+	ActorDesc.initialSupportChunkHealths = nullptr;
+	TArray<uint8> Scratch;
+	Scratch.SetNumUninitialized(NvBlastFamilyGetRequiredScratchForCreateFirstActor(BlastFamily.Get(), Nv::Blast::logLL));
+	return NvBlastFamilyCreateFirstActor(BlastFamily.Get(), &ActorDesc, Scratch.GetData(), Nv::Blast::logLL);
+}
 
 const FName UBlastMeshComponent::ActorBaseName("Actor");
 

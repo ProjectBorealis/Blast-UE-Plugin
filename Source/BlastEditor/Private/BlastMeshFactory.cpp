@@ -1,8 +1,5 @@
 #include "BlastMeshFactory.h"
 
-#include "BlastAsset.h"
-#include "BlastMesh.h"
-#include "BlastGlobals.h"
 #include "PhysicsPublic.h"
 #include "FbxImporter.h"
 #include "Misc/FbxErrors.h"
@@ -10,26 +7,34 @@
 #include "AssetRegistry/AssetRegistryModule.h"
 #include "PhysicsAssetUtils.h"
 #include "PhysicsEngine/PhysicsAsset.h"
-#include "BlastImportUI.h"
 #include "Factories/FbxSkeletalMeshImportData.h"
 #include "Misc/FeedbackContext.h"
 #include "HAL/PlatformFilemanager.h"
-#include "BlastAssetImportData.h"
 #include "Runtime/Launch/Resources/Version.h"
 #include "ComponentReregisterContext.h"
-#include "BlastCollisionFbxImporter.h"
-#include "NvBlastExtAssetUtils.h"
-#include "NvBlastGlobals.h"
-#include "BlastEditorModule.h"
-#include "BlastMeshComponent.h"
-#include "BlastDirectoryVisitor.h"
+#include "ContentBrowserModule.h"
 #include "IAssetTools.h"
 #include "ImportUtils/SkelImport.h"
 #include "Editor.h"
+#include "IContentBrowserSingleton.h"
 #include "Misc/MessageDialog.h"
 #include "Animation/Skeleton.h"
+#include "LODUtilities.h"
+#include "ObjectTools.h"
 #include "HAL/FileManager.h"
-#include "Rendering/SkeletalMeshRenderData.h"
+
+#include "BlastImportUI.h"
+#include "BlastCollisionFbxImporter.h"
+#include "BlastEditorModule.h"
+#include "BlastMeshComponent.h"
+#include "BlastDirectoryVisitor.h"
+#include "BlastAssetImportData.h"
+#include "BlastAsset.h"
+#include "BlastMesh.h"
+#include "BlastGlobals.h"
+
+#include "blast-sdk/extensions/assetutils/NvBlastExtAssetUtils.h"
+#include "NvBlastGlobals.h"
 
 #define LOCTEXT_NAMESPACE "Blast"
 
@@ -95,9 +100,9 @@ UObject* UBlastMeshFactory::FactoryCreateBinary(UClass* InClass, UObject* InPare
 	//TODO: Output name validation!
 
 	auto LoadedAsset = TSharedPtr<NvBlastAsset>(UBlastAsset::DeserializeBlastAsset(Buffer, (uint32_t)(BufferEnd - Buffer)), [](NvBlastAsset* asset)
-		{
-			NVBLAST_FREE((void*)asset);
-		});
+	{
+		NVBLAST_FREE((void*)asset);
+	});
 
 	if (!LoadedAsset.IsValid())
 	{
@@ -134,8 +139,7 @@ UObject* UBlastMeshFactory::FactoryCreateBinary(UClass* InClass, UObject* InPare
 	// First, must try to either pair or import the skeletal mesh.
 	TMap<FName, TArray<FBlastCollisionHull>> hulls;
 
-	if (!ImportUI->FBXImportUI->SkeletalMeshImportData->bConvertScene
-		|| !ImportUI->FBXImportUI->SkeletalMeshImportData->bConvertSceneUnit)
+	if (!ImportUI->FBXImportUI->SkeletalMeshImportData->bConvertScene || !ImportUI->FBXImportUI->SkeletalMeshImportData->bConvertSceneUnit)
 	{
 		UnFbx::FFbxImporter::GetInstance()->AddTokenizedErrorMessage(FTokenizedMessage::Create(EMessageSeverity::Warning, LOCTEXT("BlastImport_ConvertSceneWarning", "Convert Scene and Convert Scene Unit were not enabled. You may get mismatched Blast and rendering results.")), "BlastImportSettings");
 	}
@@ -154,8 +158,7 @@ UObject* UBlastMeshFactory::FactoryCreateBinary(UClass* InClass, UObject* InPare
 		ImportUI->FBXImportUI->SkeletalMeshImportData = ImportData;
 	}
 
-	USkeletalMesh* NewSkelMesh = ImportSkeletalMesh(BlastMesh, skelMeshName, ImportUI->ImportOptions.SkeletalMeshPath.FilePath,
-		ImportUI->ImportOptions.bImportCollisionData, ImportUI->FBXImportUI, Warn, hulls);
+	USkeletalMesh* NewSkelMesh = ImportSkeletalMesh(BlastMesh, skelMeshName, Warn, hulls);
 	if (NewSkelMesh == nullptr)
 	{
 		UnFbx::FFbxImporter::GetInstance()->AddTokenizedErrorMessage(FTokenizedMessage::Create(EMessageSeverity::Error, LOCTEXT("BlastImport_SkeletalImportFailure", "Import of skeletal mesh failed.")), "BlastImport_SkeletalImportFailure");
@@ -333,8 +336,7 @@ FTransform3f UBlastMeshFactory::GetTransformBlastToUE4CoordinateSystem(UFbxSkele
 			BlastToUE4Transform.SetRotation(FRotator3f(0, -90.0f, 0).Quaternion());
 		}
 
-		ImportTransform = FTransform3f(FRotator3f(SkeletalMeshImportData->ImportRotation),
-			FVector3f(SkeletalMeshImportData->ImportTranslation), FVector3f(SkeletalMeshImportData->ImportUniformScale));
+		ImportTransform = FTransform3f(FRotator3f(SkeletalMeshImportData->ImportRotation), FVector3f(SkeletalMeshImportData->ImportTranslation), FVector3f(SkeletalMeshImportData->ImportUniformScale));
 	}
 	return BlastToUE4Transform * ImportTransform;
 }
@@ -357,12 +359,22 @@ void UBlastMeshFactory::TransformBlastAssetFromUE4ToBlastCoordinateSystem(NvBlas
 	NvBlastExtAssetTransformInPlace(asset, &BlastToUE4Scale, &BlastToUE4Rotation, &BlastToUE4Translation);
 }
 
-
-
-USkeletalMesh* UBlastMeshFactory::ImportSkeletalMesh(UBlastMesh* BlastMesh, FName skelMeshName, FString path, bool bImportCollisionData,
-	UFbxImportUI* FBXImportUI, FFeedbackContext* Warn, TMap<FName, TArray<FBlastCollisionHull>>& hulls)
+FText UBlastMeshFactory::GetImportTaskText(const FText& TaskText) const
 {
-	UFbxSkeletalMeshImportData* SkeletalMeshImportData = FBXImportUI->SkeletalMeshImportData;
+	return bOperationCanceled ? LOCTEXT("CancellingImportingFbxMeshTask", "Cancelling FBX mesh import") : TaskText;
+}
+
+USkeletalMesh* UBlastMeshFactory::ImportSkeletalMesh(UBlastMesh* BlastMesh, FName skelMeshName, FFeedbackContext* Warn, TMap<FName, TArray<FBlastCollisionHull>>& hulls)
+{
+	FScopedSlowTask SlowTask(5, GetImportTaskText(NSLOCTEXT("FbxFactory", "BeginReadFbxFile", "Opening FBX file.")), true);
+	if (Warn->GetScopeStack().Num() == 0)
+	{
+		// We only display this slow task if there is no parent slowtask, because otherwise it is redundant and doesn't display any relevant information on the progress.
+		// It is primarly used to regroup all the smaller import sub-tasks for a smoother progression.
+		SlowTask.MakeDialog(true);
+	}
+	SlowTask.EnterProgressFrame(0);
+
 	USkeletalMesh* NewMesh = BlastMesh->Mesh;
 
 	// logger for all error/warnings
@@ -372,7 +384,7 @@ USkeletalMesh* UBlastMeshFactory::ImportSkeletalMesh(UBlastMesh* BlastMesh, FNam
 	//Clean up the options
 	UnFbx::FBXImportOptions::ResetOptions(FBXImportOptions);
 
-	UnFbx::ApplyImportUIToImportOptions(FBXImportUI, *FBXImportOptions);
+	UnFbx::ApplyImportUIToImportOptions(ImportUI->FBXImportUI, *FBXImportOptions);
 
 	//Force this off since we do it manually
 	FBXImportOptions->bCreatePhysicsAsset = false;
@@ -380,8 +392,8 @@ USkeletalMesh* UBlastMeshFactory::ImportSkeletalMesh(UBlastMesh* BlastMesh, FNam
 	//setup correct skeletal mesh
 	FBXImportOptions->SkeletonForAnimation = BlastMesh->Skeleton;
 
-	Warn->BeginSlowTask(LOCTEXT("BeginImportingFbxMeshTask", "Importing FBX mesh"), true);
-	if (!FbxImporter->ImportFromFile(path, TEXT("fbx")))
+	SlowTask.EnterProgressFrame(4, GetImportTaskText(NSLOCTEXT("FbxFactory", "BeginImportingFbxMeshTask", "Importing FBX mesh")));
+	if (!FbxImporter->ImportFromFile(ImportUI->ImportOptions.SkeletalMeshPath.FilePath, TEXT("fbx")))
 	{
 		// Log the error message and fail the import.
 		Warn->Log(ELogVerbosity::Error, FbxImporter->GetErrorMessage());
@@ -399,8 +411,8 @@ USkeletalMesh* UBlastMeshFactory::ImportSkeletalMesh(UBlastMesh* BlastMesh, FNam
 		RootNodeToImport = FbxImporter->Scene->GetRootNode();
 
 		FBlastCollisionFbxImporter collisionImporter;
-		collisionImporter.FindCollisionNodes(RootNodeToImport, bImportCollisionData);
-		if (bImportCollisionData)
+		collisionImporter.FindCollisionNodes(RootNodeToImport, ImportUI->ImportOptions.bImportCollisionData);
+		if (ImportUI->ImportOptions.bImportCollisionData)
 		{
 			collisionImporter.ReadMeshSpaceCollisionHullsFromFBX(BlastMesh, hulls);
 		}
@@ -411,7 +423,7 @@ USkeletalMesh* UBlastMeshFactory::ImportSkeletalMesh(UBlastMesh* BlastMesh, FNam
 
 		// For animation and static mesh we assume there is at lease one interesting node by default
 		int32 InterestingNodeCount = 1;
-		TArray< TArray<FbxNode*>* > SkelMeshArray;
+		TArray<TArray<FbxNode*>*> SkelMeshArray;
 
 		FbxImporter->FillFbxSkelMeshArrayInScene(RootNodeToImport, SkelMeshArray, false, false);
 
@@ -423,34 +435,36 @@ USkeletalMesh* UBlastMeshFactory::ImportSkeletalMesh(UBlastMesh* BlastMesh, FNam
 		//const FString Filename(UFactory::CurrentFilename);
 		if (RootNodeToImport && InterestingNodeCount > 0)
 		{
-			// NOTE: If we've got more than one entry in SkelMeshArray we're probably trying to import bad data, since that means more than one skeletal mesh in that FBX
-
+			int32 NodeIndex = 0;
 			int32 TotalNumNodes = 0;
-			for (int32 i = 0; i < SkelMeshArray.Num(); i++)
+			for (int32 i = 0; i < SkelMeshArray.Num() && !bOperationCanceled; i++)
 			{
+				USkeletalMesh* BaseSkeletalMesh = nullptr;
 				TArray<FbxNode*> NodeArray = *SkelMeshArray[i];
 
 				TotalNumNodes += NodeArray.Num();
-
 				// check if there is LODGroup for this skeletal mesh
-				int32 MaxLODLevel = 1;
+				int32 MaxNumberOfLOD = 1;
 				for (int32 j = 0; j < NodeArray.Num(); j++)
 				{
 					FbxNode* Node = NodeArray[j];
 					if (Node->GetNodeAttribute() && Node->GetNodeAttribute()->GetAttributeType() == FbxNodeAttribute::eLODGroup)
 					{
 						// get max LODgroup level
-						if (MaxLODLevel < Node->GetChildCount())
+						if (MaxNumberOfLOD < Node->GetChildCount())
 						{
-							MaxLODLevel = Node->GetChildCount();
+							MaxNumberOfLOD = Node->GetChildCount();
 						}
 					}
 				}
 
-				int32 LODIndex;
 				int32 SuccessfulLodIndex = 0;
-				bool bImportSkeletalMeshLODs = SkeletalMeshImportData->bImportMeshLODs;
-				for (LODIndex = 0; LODIndex < MaxLODLevel; LODIndex++)
+				bool bImportSkeletalMeshLODs = ImportUI->FBXImportUI->SkeletalMeshImportData->bImportMeshLODs;
+
+				//The skeletalmesh will be set after we import the LOD 0 since it is not created yet.
+				FScopedSkeletalMeshPostEditChange ScopedPostEditChange(nullptr);
+
+				for (int32 LODIndex = 0; LODIndex < MaxNumberOfLOD && !bOperationCanceled; LODIndex++)
 				{
 					//We need to know what is the imported lod index when importing the morph targets
 					int32 ImportedSuccessfulLodIndex = INDEX_NONE;
@@ -485,46 +499,69 @@ USkeletalMesh* UBlastMeshFactory::ImportSkeletalMesh(UBlastMesh* BlastMesh, FNam
 							SkelMeshNodeArray.Add(Node);
 						}
 					}
-
-					bool bMapMorphTargetToTimeZero = false;
 					FSkeletalMeshImportData OutData;
-					UnFbx::FFbxImporter::FImportSkeletalMeshArgs ImportArgs;
-					ImportArgs.InParent = BlastMesh;
-					ImportArgs.NodeArray = SkelMeshNodeArray;
-					ImportArgs.TemplateImportData = SkeletalMeshImportData;
-					ImportArgs.OutData = &OutData;
-
+					bool bMapMorphTargetToTimeZero = false;
 					if (LODIndex == 0 && SkelMeshNodeArray.Num() != 0)
 					{
-						ImportArgs.LodIndex = LODIndex;
-						ImportArgs.Flags = RF_NoFlags;
-						//TODO
-						//FString PreviousFileName = UFactory::GetCurrentFilename();
-						//UFactory::CurrentFilename = SkeletalMeshPath;
-						NewMesh = FbxImporter->ImportSkeletalMesh(ImportArgs);
+						FName OutputName = FbxImporter->MakeNameForMesh(skelMeshName.ToString(), SkelMeshNodeArray[0]);
 
-						//UFactory::CurrentFilename = PreviousFileName;
+						UnFbx::FFbxImporter::FImportSkeletalMeshArgs ImportSkeletalMeshArgs;
+						ImportSkeletalMeshArgs.InParent = BlastMesh;
+						ImportSkeletalMeshArgs.NodeArray = SkelMeshNodeArray;
+						ImportSkeletalMeshArgs.Name = OutputName;
+						ImportSkeletalMeshArgs.Flags = RF_NoFlags;
+						ImportSkeletalMeshArgs.TemplateImportData = ImportUI->FBXImportUI->SkeletalMeshImportData;
+						ImportSkeletalMeshArgs.LodIndex = LODIndex;
+						ImportSkeletalMeshArgs.OutData = &OutData;
 
-						if (NewMesh && !FbxImporter->GetImportOperationCancelled())
+						BaseSkeletalMesh = FbxImporter->ImportSkeletalMesh(ImportSkeletalMeshArgs);
+						bOperationCanceled |= FbxImporter->GetImportOperationCancelled() || SlowTask.ShouldCancel();
+
+						if (BaseSkeletalMesh && !bOperationCanceled)
 						{
+							//Set the base skeletalmesh to the scoped post edit change variable
+							ScopedPostEditChange.SetSkeletalMesh(BaseSkeletalMesh);
+							bMapMorphTargetToTimeZero = ImportSkeletalMeshArgs.bMapMorphTargetToTimeZero;
+							ImportedSuccessfulLodIndex = SuccessfulLodIndex;
 							//Increment the LOD index
-							bMapMorphTargetToTimeZero = ImportArgs.bMapMorphTargetToTimeZero;
 							SuccessfulLodIndex++;
 						}
 					}
-					else if (NewMesh) // the base skeletal mesh is imported successfully
+					else if (BaseSkeletalMesh && SkelMeshNodeArray[0]->GetMesh() == nullptr)
 					{
-						ImportArgs.LodIndex = SuccessfulLodIndex;
-						ImportArgs.Flags = RF_Transient;
+						FSkeletalMeshUpdateContext UpdateContext;
+						UpdateContext.SkeletalMesh = BaseSkeletalMesh;
+						//Add a autogenerated LOD to the BaseSkeletalMesh
+						FSkeletalMeshLODInfo& LODInfo = BaseSkeletalMesh->AddLODInfo();
+						LODInfo.ReductionSettings.NumOfTrianglesPercentage = FMath::Pow(0.5f, (float)(SuccessfulLodIndex));
+						LODInfo.ReductionSettings.BaseLOD = 0;
+						LODInfo.bImportWithBaseMesh = true;
+						LODInfo.SourceImportFilename = FString(TEXT(""));
+						FLODUtilities::SimplifySkeletalMeshLOD(UpdateContext, SuccessfulLodIndex, GetTargetPlatformManagerRef().GetRunningTargetPlatform());
+						ImportedSuccessfulLodIndex = SuccessfulLodIndex;
+						SuccessfulLodIndex++;
+					}
+					else if (BaseSkeletalMesh) // the base skeletal mesh is imported successfully
+					{
+						FName LODObjectName = NAME_None;
+						UnFbx::FFbxImporter::FImportSkeletalMeshArgs ImportSkeletalMeshArgs;
+						ImportSkeletalMeshArgs.InParent = BaseSkeletalMesh->GetOutermost();
+						ImportSkeletalMeshArgs.NodeArray = SkelMeshNodeArray;
+						ImportSkeletalMeshArgs.Name = LODObjectName;
+						ImportSkeletalMeshArgs.Flags = RF_Transient;
+						ImportSkeletalMeshArgs.TemplateImportData = ImportUI->FBXImportUI->SkeletalMeshImportData;
+						ImportSkeletalMeshArgs.LodIndex = SuccessfulLodIndex;
+						ImportSkeletalMeshArgs.OutData = &OutData;
 
-						USkeletalMesh* BaseSkeletalMesh = NewMesh;
-						USkeletalMesh* LODObject = FbxImporter->ImportSkeletalMesh(ImportArgs);
-						bool bImportSucceeded = !FbxImporter->GetImportOperationCancelled() && FbxImporter->ImportSkeletalMeshLOD(LODObject, BaseSkeletalMesh, SuccessfulLodIndex);
+						USkeletalMesh* LODObject = FbxImporter->ImportSkeletalMesh(ImportSkeletalMeshArgs);
+						bOperationCanceled |= FbxImporter->GetImportOperationCancelled();
 
-						if (bImportSucceeded)
+						if (!bOperationCanceled && FbxImporter->ImportSkeletalMeshLOD(LODObject, BaseSkeletalMesh, SuccessfulLodIndex))
 						{
-							BaseSkeletalMesh->GetLODInfo(SuccessfulLodIndex)->ScreenSize = 1.0f / (MaxLODLevel * SuccessfulLodIndex);
-							bMapMorphTargetToTimeZero = ImportArgs.bMapMorphTargetToTimeZero;
+							FSkeletalMeshLODInfo* LODInfo = BaseSkeletalMesh->GetLODInfo(SuccessfulLodIndex);
+							LODInfo->bImportWithBaseMesh = true;
+							LODInfo->SourceImportFilename = FString(TEXT(""));
+							bMapMorphTargetToTimeZero = ImportSkeletalMeshArgs.bMapMorphTargetToTimeZero;
 							ImportedSuccessfulLodIndex = SuccessfulLodIndex;
 							SuccessfulLodIndex++;
 						}
@@ -534,20 +571,48 @@ USkeletalMesh* UBlastMeshFactory::ImportSkeletalMesh(UBlastMesh* BlastMesh, FNam
 						}
 					}
 
-					if (NewMesh && SkeletalMeshImportData->bImportMorphTargets && ImportedSuccessfulLodIndex != INDEX_NONE)
+					bOperationCanceled |= SlowTask.ShouldCancel();
+
+					// import morph target
+					if (!bOperationCanceled && BaseSkeletalMesh && FBXImportOptions->bImportMorph && ImportedSuccessfulLodIndex != INDEX_NONE)
 					{
 						// Disable material importing when importing morph targets
 						uint32 bImportMaterials = FBXImportOptions->bImportMaterials;
 						FBXImportOptions->bImportMaterials = 0;
 						uint32 bImportTextures = FBXImportOptions->bImportTextures;
 						FBXImportOptions->bImportTextures = 0;
-						
-						FbxImporter->ImportFbxMorphTarget(SkelMeshNodeArray, NewMesh, ImportedSuccessfulLodIndex, OutData, bMapMorphTargetToTimeZero);
+
+						FbxImporter->ImportFbxMorphTarget(SkelMeshNodeArray, BaseSkeletalMesh, ImportedSuccessfulLodIndex, OutData, bMapMorphTargetToTimeZero);
+						bOperationCanceled |= FbxImporter->GetImportOperationCancelled();
 
 						FBXImportOptions->bImportMaterials = !!bImportMaterials;
 						FBXImportOptions->bImportTextures = !!bImportTextures;
 					}
+
+					bOperationCanceled |= SlowTask.ShouldCancel();
 				}
+
+				if (BaseSkeletalMesh && !bOperationCanceled)
+				{
+					NodeIndex++;
+					FFormatNamedArguments Args;
+					Args.Add(TEXT("NodeIndex"), NodeIndex);
+					Args.Add(TEXT("ArrayLength"), SkelMeshArray.Num());
+					SlowTask.EnterProgressFrame(0, GetImportTaskText(FText::Format(NSLOCTEXT("UnrealEd", "Importingf", "Importing ({NodeIndex} of {ArrayLength})"), Args)));
+
+					UnFbx::FFbxImporter::UpdateSkeletalMeshImportData(BaseSkeletalMesh, ImportUI->FBXImportUI->SkeletalMeshImportData, INDEX_NONE, nullptr, nullptr);
+
+					if (NewMesh == nullptr)
+					{
+						NewMesh = BaseSkeletalMesh;
+					}
+					else if (NewMesh != BaseSkeletalMesh)
+					{
+						AdditionalImportedObjects.Add(BaseSkeletalMesh);
+					}
+				}
+
+				bOperationCanceled |= SlowTask.ShouldCancel();
 			}
 
 			for (int32 i = 0; i < SkelMeshArray.Num(); i++)
@@ -558,17 +623,48 @@ USkeletalMesh* UBlastMeshFactory::ImportSkeletalMesh(UBlastMesh* BlastMesh, FNam
 			// if total nodes we found is 0, we didn't find anything. 
 			if (TotalNumNodes == 0)
 			{
-				FbxImporter->AddTokenizedErrorMessage(FTokenizedMessage::Create(EMessageSeverity::Error, LOCTEXT("FailedToImport_NoMeshFoundOnRoot", "Could not find any valid mesh on the root hierarchy. If you have mesh in the sub hierarchy, please enable option of [Import Meshes In Bone Hierarchy] when import.")),
-					FFbxErrors::SkeletalMesh_NoMeshFoundOnRoot);
+				FbxImporter->AddTokenizedErrorMessage(FTokenizedMessage::Create(EMessageSeverity::Error, LOCTEXT("FailedToImport_NoMeshFoundOnRoot", "Could not find any valid mesh on the root hierarchy. If you have mesh in the sub hierarchy, please enable option of [Import Meshes In Bone Hierarchy] when import.")), FFbxErrors::SkeletalMesh_NoMeshFoundOnRoot);
+			}
+		}
+		else
+		{
+			if (RootNodeToImport == NULL)
+			{
+				FbxImporter->AddTokenizedErrorMessage(FTokenizedMessage::Create(EMessageSeverity::Error, LOCTEXT("FailedToImport_InvalidRoot", "Could not find root node.")), FFbxErrors::SkeletalMesh_InvalidRoot);
+			}
+			else if (ImportUI->FBXImportUI->MeshTypeToImport == FBXIT_SkeletalMesh)
+			{
+				FbxImporter->AddTokenizedErrorMessage(FTokenizedMessage::Create(EMessageSeverity::Error, LOCTEXT("FailedToImport_InvalidBone", "Failed to find any bone hierarchy. Try disabling the \"Import As Skeletal\" option to import as a rigid mesh. ")), FFbxErrors::SkeletalMesh_InvalidBone);
+			}
+			else
+			{
+				FbxImporter->AddTokenizedErrorMessage(FTokenizedMessage::Create(EMessageSeverity::Error, LOCTEXT("FailedToImport_InvalidNode", "Could not find any node.")), FFbxErrors::SkeletalMesh_InvalidNode);
 			}
 		}
 	}
 
-	if (NewMesh == nullptr)
+	if (NewMesh == nullptr && !bOperationCanceled)
 	{
 		FbxImporter->AddTokenizedErrorMessage(FTokenizedMessage::Create(EMessageSeverity::Error, LOCTEXT("FailedToImport_NoObject", "Import failed.")), FFbxErrors::Generic_ImportingNewObjectFailed);
 	}
+
+	if (bOperationCanceled)
+	{
+		FbxImporter->AddTokenizedErrorMessage(FTokenizedMessage::Create(EMessageSeverity::Info, LOCTEXT("FailedToImport_OperationCanceled", "Import was canceled.")), FFbxErrors::Generic_ImportingNewObjectFailed);
+		AdditionalImportedObjects.Empty();
+		CancelObjectCreation(FbxImporter);
+		NewMesh = nullptr;
+	}
 	else
+	{
+		FbxImporter->ReleaseScene();
+	}
+	
+	if (NewMesh)
+	{
+		GEditor->GetEditorSubsystem<UImportSubsystem>()->BroadcastAssetPostImport(this, NewMesh);
+	}
+	/*if (NewMesh)
 	{
 		NewMesh->CalculateInvRefMatrices();
 		if ((!NewMesh->GetResourceForRendering() || !NewMesh->GetResourceForRendering()->LODRenderData.IsValidIndex(0)))
@@ -576,12 +672,67 @@ USkeletalMesh* UBlastMeshFactory::ImportSkeletalMesh(UBlastMesh* BlastMesh, FNam
 			NewMesh->Build();
 		}
 		NewMesh->MarkPackageDirty();
+	}*/
+
+	return NewMesh;
+}
+
+void UBlastMeshFactory::CancelObjectCreation(UnFbx::FFbxImporter* FbxImporter) const
+{
+	FAssetRegistryModule& AssetRegistryModule = FModuleManager::LoadModuleChecked<FAssetRegistryModule>("AssetRegistry");
+	const TArray<TWeakObjectPtr<UObject>>& CreatedObjects = FbxImporter->GetCreatedObjects();
+	TArray<FAssetData> AssetsToDelete;
+	TArray<TWeakObjectPtr<UPackage>> PotentialPackageToDeleteReferences;
+	
+	// Flag for deletion the newly created objects in memory.
+	for (int32 CreatedObjectIndex = 0; CreatedObjectIndex < CreatedObjects.Num(); ++CreatedObjectIndex)
+	{
+		const TWeakObjectPtr<UObject>& CurrentObject = CreatedObjects[CreatedObjectIndex];
+		if (CurrentObject.IsValid())
+		{
+			AssetsToDelete.Emplace(AssetRegistryModule.Get().GetAssetByObjectPath(FSoftObjectPath(CurrentObject.Get())));
+			PotentialPackageToDeleteReferences.Add(CurrentObject->GetOutermost());
+			CurrentObject->ClearFlags(RF_Standalone | RF_Public);
+			CurrentObject->RemoveFromRoot();
+			CurrentObject->MarkAsGarbage();
+		}
+	}
+	CollectGarbage(GARBAGE_COLLECTION_KEEPFLAGS);
+
+	// Delete any remaining newly created assets.
+	TArray<UObject*> CreatedObjectsPtr;
+	for (int32 CreatedObjectIndex = 0; CreatedObjectIndex < AssetsToDelete.Num(); ++CreatedObjectIndex)
+	{
+		const FAssetData& CurrentObject = AssetsToDelete[CreatedObjectIndex];
+		UObject* AssetToDelete = CurrentObject.GetAsset();
+		if (AssetToDelete != nullptr)
+		{
+			CreatedObjectsPtr.AddUnique(AssetToDelete);
+		}
+	}
+	bool bObjectsDeleted = ObjectTools::ForceDeleteObjects(CreatedObjectsPtr, false) > 0;
+	if (bObjectsDeleted)
+	{
+		CollectGarbage(GARBAGE_COLLECTION_KEEPFLAGS);
 	}
 
 	FbxImporter->ReleaseScene();
-	Warn->EndSlowTask();
 
-	return NewMesh;
+	//We make sure sure to cleanup any remaining empty packages, otherwise we will be prompted to save them even if they don't contain any asset.
+	TArray<UPackage*> PotentialPackageToDelete;
+	for (int32 PackageIndex = PotentialPackageToDeleteReferences.Num() - 1; PackageIndex >= 0; --PackageIndex)
+	{
+		if (PotentialPackageToDeleteReferences[PackageIndex].IsValid())
+		{
+			PotentialPackageToDelete.Add(PotentialPackageToDeleteReferences[PackageIndex].Get());
+		}
+}
+	ObjectTools::CleanupAfterSuccessfulDelete(PotentialPackageToDelete);
+
+	//Make sure the content browser is in sync after we delete, to avoid stale references.
+	FContentBrowserModule& ContentBrowserModule = FModuleManager::Get().LoadModuleChecked<FContentBrowserModule>("ContentBrowser");
+	const bool bAllowLockedBrowser = true;
+	ContentBrowserModule.Get().SyncBrowserToAssets(AssetsToDelete, bAllowLockedBrowser);
 }
 
 bool UBlastMeshFactory::RebuildPhysicsAsset(UBlastMesh* BlastMesh, const TMap<FName, TArray<FBlastCollisionHull>>& hulls)

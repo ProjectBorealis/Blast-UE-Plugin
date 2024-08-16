@@ -8,14 +8,15 @@
 #include "BlastMeshUtilities.h"
 #include "BlastGlobals.h"
 
-#include "NvBlastExtAuthoring.h"
-#include "NvBlastExtAuthoringTypes.h"
-#include "NvBlastExtAuthoringBondGenerator.h"
-#include "NvBlastExtAuthoringConvexMeshBuilder.h"
-#include "NvBlastExtAuthoringMesh.h"
-#include "NvBlastExtAuthoringFractureTool.h"
+#include "blast-sdk/extensions/authoringCommon/NvBlastExtAuthoringTypes.h"
+#include "blast-sdk/extensions/authoringCommon/NvBlastExtAuthoringConvexMeshBuilder.h"
+#include "blast-sdk/extensions/authoringCommon/NvBlastExtAuthoringMesh.h"
+#include "blast-sdk/extensions/authoring/NvBlastExtAuthoring.h"
+#include "blast-sdk/extensions/authoring/NvBlastExtAuthoringBondGenerator.h"
+#include "blast-sdk/extensions/authoring/NvBlastExtAuthoringFractureTool.h"
+#include "blast-sdk/extensions/authoring/NvBlastExtAuthoringMeshCleaner.h"
 #include "NvBlast.h"
-#include "NvBlastGlobals.h"
+#include "blast-sdk/globals/NvBlastGlobals.h"
 
 #include "Misc/ScopedSlowTask.h"
 #include "Factories/FbxSkeletalMeshImportData.h"
@@ -29,9 +30,7 @@
 #include "RawMesh.h"
 #include "Engine/Texture2D.h"
 #include "MeshDescriptionOperations.h"
-#include "NvBlastExtAuthoringMeshCleaner.h"
 
-#include "Chaos/Core.h"
 #include "Chaos/Convex.h"
 
 #define LOCTEXT_NAMESPACE "BlastMeshEditor"
@@ -1345,15 +1344,14 @@ bool FBlastFracture::FractureCutout(TSharedPtr<FFractureSession> FractureSession
 	{
 		CutoutConfig.cutoutSet = NvBlastExtAuthoringCreateCutoutSet();
 
-		TArray64<uint8_t> Buf, Mip;
-		Pattern->Source.GetMipData(Mip, 0);
+		TArray64<uint8_t> Buf;
+		FImage Img;
+		Pattern->Source.GetMipImage(Img, 0);
 		int32 sz = Pattern->Source.GetSizeX() * Pattern->Source.GetSizeY();
-		Buf.Reserve(sz * 3);
+		Buf.SetNumZeroed(sz * 3);
 		for (int32 i = 0; i < sz; i++)
 		{
-			Buf.Push(Mip[i * 4]);
-			Buf.Push(Mip[i * 4 + 1]);
-			Buf.Push(Mip[i * 4 + 2]);
+			FMemory::Memset(Buf.GetData() + i*3, Img.RawData[i * Img.GetBytesPerPixel()], 3);
 		}
 		float SegmentationErrorThreshold = 1e-3; //Move this to advanced settings?
 		float SnapThreshold = 1.f;

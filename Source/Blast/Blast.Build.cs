@@ -78,17 +78,6 @@ namespace UnrealBuildTool.Rules
         {
             OptimizeCode = CodeOptimization.InNonDebugBuilds;
 
-            PublicIncludePaths.AddRange(
-                new string[] {
-                    Path.GetFullPath(Path.Combine(ModuleDirectory, "Public/extensions/serialization/")),
-                    Path.GetFullPath(Path.Combine(ModuleDirectory, "Public/extensions/shaders/")),
-                    Path.GetFullPath(Path.Combine(ModuleDirectory, "Public/extensions/stress/")),
-                    Path.GetFullPath(Path.Combine(ModuleDirectory, "Public/shared/NvFoundation/")),
-                    Path.GetFullPath(Path.Combine(ModuleDirectory, "Public/globals/")),
-                    Path.GetFullPath(Path.Combine(ModuleDirectory, "Public/lowlevel/")),
-                }
-            );
-
             PrivateDependencyModuleNames.AddRange(
                 new string[]
                 {
@@ -134,15 +123,10 @@ namespace UnrealBuildTool.Rules
             PrivateIncludePaths.AddRange(
                 new string[]
                 {
-                    "Blast/Public/extensions/assetutils",
-                    "Blast/Public/extensions/authoring",
-                    "Blast/Public/extensions/authoringCommon",
-                    "Blast/Public/extensions/serialization",
-                    "Blast/Public/extensions/shaders",
-                    "Blast/Public/extensions/stress",
-                    "Blast/Public/shared/NvFoundation",
-                    "Blast/Public/globals",
-                    "Blast/Public/lowlevel"
+	                Path.GetFullPath(Path.Combine(PluginDirectory, "Libraries", "include")),
+	                Path.GetFullPath(Path.Combine(PluginDirectory, "Libraries", "include", "blast-sdk", "lowlevel")),
+	                Path.GetFullPath(Path.Combine(PluginDirectory, "Libraries", "include", "blast-sdk", "globals")),
+	                Path.GetFullPath(Path.Combine(PluginDirectory, "Libraries", "include", "blast-sdk", "shared", "NvFoundation"))
                 }
             );
 
