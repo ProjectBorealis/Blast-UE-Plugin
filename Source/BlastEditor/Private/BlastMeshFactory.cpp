@@ -512,7 +512,7 @@ USkeletalMesh* UBlastMeshFactory::ImportSkeletalMesh(UBlastMesh* BlastMesh, FNam
 						UnFbx::FFbxImporter::FImportSkeletalMeshArgs ImportSkeletalMeshArgs;
 						ImportSkeletalMeshArgs.InParent = BlastMesh;
 						ImportSkeletalMeshArgs.NodeArray = SkelMeshNodeArray;
-						ImportSkeletalMeshArgs.Name = Name;
+						ImportSkeletalMeshArgs.Name = *Name;
 						ImportSkeletalMeshArgs.Flags = RF_NoFlags;
 						ImportSkeletalMeshArgs.TemplateImportData = ImportUI->FBXImportUI->SkeletalMeshImportData;
 						ImportSkeletalMeshArgs.LodIndex = LODIndex;
