@@ -546,8 +546,16 @@ Nv::Blast::Mesh* CreateMeshFromImportedData(const FMeshData& MeshData, bool bCle
 
 	if (mesh)
 	{
-		mesh->setMaterialId(MeshData.MaterialIDs.GetData());
-		mesh->setSmoothingGroup(MeshData.SmoothingGroups.GetData());
+		const int32 NumFaces = MeshData.Indices.Num() / 3;
+		if (MeshData.MaterialIDs.Num() == NumFaces)
+		{
+			mesh->setMaterialId(MeshData.MaterialIDs.GetData());
+		}
+		
+		if (MeshData.SmoothingGroups.Num() == NumFaces)
+		{
+			mesh->setSmoothingGroup(MeshData.SmoothingGroups.GetData());
+		}
 		
 		if (bClean)
 		{
