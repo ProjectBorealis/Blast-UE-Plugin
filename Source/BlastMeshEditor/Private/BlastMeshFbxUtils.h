@@ -8,6 +8,8 @@
 #include "fbxsdk.h"
 #include "NvCTypes.h"
 
+DECLARE_LOG_CATEGORY_EXTERN(LogBlastIO, Log, All);
+
 namespace Nv
 {
 	namespace Blast

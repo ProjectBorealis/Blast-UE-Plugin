@@ -37,7 +37,7 @@
 #include <set>
 #include <functional>
 
-#include "BlastMeshExporterFbxUtils.h"
+#include "BlastMeshFbxUtils.h"
 
 #include "NvBlastTypes.h"
 #include "NvBlastGlobals.h"

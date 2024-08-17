@@ -1,6 +1,30 @@
 // Copyright 1998-2017 Epic Games, Inc. All Rights Reserved.
 
 #include "BlastMeshEditor.h"
+
+#include "Misc/Paths.h"
+#include "Misc/MessageDialog.h"
+#include "DesktopPlatformModule.h"
+#include "Framework/Commands/UICommandList.h"
+#include "FbxImporter.h"
+#include "Framework/MultiBox/MultiBoxBuilder.h"
+#include "Components/SkinnedMeshComponent.h"
+#include "Engine/StaticMesh.h"
+#include "Modules/ModuleManager.h"
+#include "Widgets/Input/SSlider.h"
+#include "EditorReimportHandler.h"
+#include "Widgets/Views/SListView.h"
+#include "Widgets/Layout/SScrollBox.h"
+#include "Editor.h"
+#include "PropertyEditorModule.h"
+#include "IDetailsView.h"
+#include "Widgets/Docking/SDockTab.h"
+#include "Engine/Selection.h"
+#include "SAdvancedPreviewDetailsTab.h"
+#include "Math/UnrealMathUtility.h"
+#include "Widgets/Input/SButton.h"
+#include "Widgets/Images/SImage.h"
+
 #include "BlastMeshEditorCommands.h"
 #include "BlastChunkParamsProxy.h"
 #include "BlastMeshEditorModule.h"
@@ -13,36 +37,6 @@
 #include "BlastMeshEditorDialogs.h"
 #include "BlastGlobals.h"
 
-#include "Misc/Paths.h"
-#include "Misc/MessageDialog.h"
-#include "EditorDirectories.h"
-#include "DesktopPlatformModule.h"
-#include "Framework/Commands/UICommandList.h"
-#include "FbxImporter.h"
-#include "Factories/FbxStaticMeshImportData.h"
-#include "Framework/MultiBox/MultiBoxBuilder.h"
-#include "Components/SkinnedMeshComponent.h"
-#include "Engine/StaticMesh.h"
-#include "Modules/ModuleManager.h"
-#include "Widgets/Input/SSlider.h"
-#include "EditorReimportHandler.h"
-#include "Widgets/Views/SListView.h"
-#include "Widgets/Layout/SUniformGridPanel.h"
-#include "Widgets/Input/SNumericEntryBox.h"
-#include "Widgets/Layout/SScrollBox.h"
-#include "Editor.h"
-#include "PropertyEditorModule.h"
-#include "IDetailsView.h"
-#include "Widgets/Docking/SDockTab.h"
-#include "Engine/Selection.h"
-#include "SAdvancedPreviewDetailsTab.h"
-#include "EngineUtils.h"
-#include "Math/UnrealMathUtility.h"
-#include "Widgets/Input/SButton.h"
-#include "EditorStyleSet.h"
-#include "Widgets/Images/SImage.h"
-#include "Blueprint/WidgetLayoutLibrary.h"
-#include "Components/CanvasPanelSlot.h"
 #include "NvBlastExtAuthoringTypes.h"
 
 
@@ -436,6 +430,13 @@ void FBlastMeshEditor::BindCommands()
 		FIsActionChecked());
 
 	UICommandList->MapAction(
+		Commands.ImportRootFromFbx,
+		FExecuteAction::CreateSP(this, &FBlastMeshEditor::ImportRootFromFBXDialog),
+		FCanExecuteAction::CreateSP(this, &FBlastMeshEditor::CanImportRootFromStaticMesh),
+		FCanExecuteAction(),
+		FIsActionChecked());
+
+	UICommandList->MapAction(
 		Commands.Undo,
 		FExecuteAction::CreateSP(this, &FBlastMeshEditor::UndoFracture),
 		FCanExecuteAction::CreateSP(this, &FBlastMeshEditor::CanUndoFracture),
@@ -462,6 +463,7 @@ void FillCommandToolbar(FToolBarBuilder& ToolbarBuilder, TSharedRef<SWidget> Pre
 		ToolbarBuilder.AddToolBarButton(FBlastMeshEditorCommands::Get().FixChunkHierarchy);
 		//ToolbarBuilder.AddToolBarButton(FBlastMeshEditorCommands::Get().Refresh);
 		ToolbarBuilder.AddToolBarButton(FBlastMeshEditorCommands::Get().ImportRootFromStaticMesh);
+		ToolbarBuilder.AddToolBarButton(FBlastMeshEditorCommands::Get().ImportRootFromFbx);
 		ToolbarBuilder.AddToolBarButton(FBlastMeshEditorCommands::Get().FitUvCoordinates);
 		ToolbarBuilder.AddToolBarButton(FBlastMeshEditorCommands::Get().ChunksFromIslands);
 		ToolbarBuilder.AddToolBarButton(FBlastMeshEditorCommands::Get().RebuildCollisionMesh);
@@ -963,29 +965,85 @@ bool FBlastMeshEditor::CanRedoFracture()
 
 void FBlastMeshEditor::ImportRootFromStaticMesh()
 {
-	if (BlastMesh)
+	if (!BlastMesh)
 	{
-		const SSelectStaticMeshDialog::FLoadMeshResult LoadResult = SSelectStaticMeshDialog::ShowWindow();
-		if (LoadResult.Mesh)
+		return;
+	}
+	
+	const SSelectStaticMeshDialog::FLoadMeshResult LoadResult = SSelectStaticMeshDialog::ShowWindow();
+	if (LoadResult.Mesh)
+	{
+		FTextBuilder TextBuilder;
+		TextBuilder.AppendLine(LOCTEXT("BlastMeshEditor_IsReplaceSourceMesh",
+		                               "Source mesh already exist. Do you want replace it with selected static mesh?"));
+		if (BlastMesh->Mesh == nullptr || FMessageDialog::Open(EAppMsgType::YesNo, TextBuilder.ToText()) ==
+			EAppReturnType::Yes)
 		{
-			FTextBuilder TextBuilder;
-			TextBuilder.AppendLine(LOCTEXT("BlastMeshEditor_IsReplaceSourceMesh",
-			                               "Source mesh already exist. Do you want replace it with seleted static mesh?"));
-			if (BlastMesh->Mesh == nullptr || FMessageDialog::Open(EAppMsgType::YesNo, TextBuilder.ToText()) ==
-				EAppReturnType::Yes)
+			if (FractureSettings->FractureSession.IsValid())
 			{
-				if (FractureSettings->FractureSession.IsValid())
-				{
-					Fracturer->FinishFractureSession(FractureSettings->FractureSession);
-					FractureSettings->Reset();
-				}
-				FractureSettings->FractureSession = Fracturer->StartFractureSession(
-					BlastMesh, LoadResult.Mesh, LoadResult.bCleanMesh, FractureSettings);
-				SelectedChunkIndices.Empty();
-				OnBlastMeshReloaded();
-				Viewport->ResetCamera();
+				Fracturer->FinishFractureSession(FractureSettings->FractureSession);
+				FractureSettings->Reset();
 			}
+			FractureSettings->FractureSession = Fracturer->StartFractureSession(
+				BlastMesh, LoadResult.Mesh, LoadResult.bCleanMesh, FractureSettings);
+			SelectedChunkIndices.Empty();
+			OnBlastMeshReloaded();
+			Viewport->ResetCamera();
 		}
+	}
+}
+
+void FBlastMeshEditor::ImportRootFromFBX(const FString& InFilePath, bool bCleanMesh)
+{
+	if (!Fracturer || !BlastMesh)
+	{
+		UE_LOG(LogBlastMeshEditor, Error, TEXT("Blast not initialized correctly, cannot import root chunk"));
+		return;
+	}
+	
+	
+	FTextBuilder TextBuilder;
+	TextBuilder.AppendLine(LOCTEXT("BlastMeshEditor_IsReplaceSourceMesh",
+								   "Source mesh already exist. Do you want replace it with selected static mesh?"));
+	if (!BlastMesh->Mesh || FMessageDialog::Open(EAppMsgType::YesNo, TextBuilder.ToText()) == EAppReturnType::Yes)
+	{
+		if (Fracturer->ImportRootChunk(BlastMesh, FractureSettings, InFilePath, bCleanMesh))
+		{
+			SelectedChunkIndices.Empty();
+			OnBlastMeshReloaded();
+			Viewport->ResetCamera();
+		}
+	}
+}
+
+void FBlastMeshEditor::ImportRootFromFBXDialog()
+{
+	IDesktopPlatform* DesktopPlatform = FDesktopPlatformModule::Get();
+	const void* ParentWindowWindowHandle = FSlateApplication::Get().FindBestParentWindowHandleForDialogs(nullptr);
+
+	const FText Title = LOCTEXT("ImportRootChunkFromFBX", "Import chunk from FBX...");
+	const FString FileTypes = TEXT("Autodesk FBX (*.fbx)|*.fbx");
+
+	TArray<FString> OutFilenames;
+	DesktopPlatform->OpenFileDialog(
+		ParentWindowWindowHandle,
+		Title.ToString(),
+		{},
+		{},
+		FileTypes,
+		EFileDialogFlags::None,
+		OutFilenames
+	);
+
+	if (OutFilenames.IsEmpty())
+	{
+		return;
+	}
+
+	const TOptional<SBlastRootImportSettingsDialog::FImportSettingsResult> LoadResult = SBlastRootImportSettingsDialog::ShowWindow();
+	if (LoadResult)
+	{
+		ImportRootFromFBX(OutFilenames[0], LoadResult->bCleanMesh);
 	}
 }
 

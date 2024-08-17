@@ -487,29 +487,29 @@ void FinalizeMeshCreation(USkeletalMesh* SkeletalMesh)
 	SkeletalMesh->MarkPackageDirty();
 }
 
-void CreateSkeletalMeshFromAuthoring(TSharedPtr<FFractureSession> FractureSession, UStaticMesh* InSourceStaticMesh)
+void CreateSkeletalMeshFromAuthoring(TSharedPtr<FFractureSession> FractureSession, const UStaticMesh& InSourceStaticMesh)
 {
 	UBlastMesh* BlastMesh = FractureSession->BlastMesh;
 	BlastMesh->Mesh = nullptr;
 	BlastMesh->Skeleton = nullptr;
 	BlastMesh->PhysicsAsset = NewObject<UPhysicsAsset>(
-		BlastMesh, *InSourceStaticMesh->GetName().Append(TEXT("_PhysicsAsset")), RF_NoFlags);
+		BlastMesh, *InSourceStaticMesh.GetName().Append(TEXT("_PhysicsAsset")), RF_NoFlags);
 	if (!BlastMesh->AssetImportData)
 	{
 		BlastMesh->AssetImportData = NewObject<UBlastAssetImportData>(BlastMesh);
 	}
 	
-	USkeleton* Skeleton = NewObject<USkeleton>(BlastMesh, *InSourceStaticMesh->GetName().Append(TEXT("_Skeleton")));
+	USkeleton* Skeleton = NewObject<USkeleton>(BlastMesh, *InSourceStaticMesh.GetName().Append(TEXT("_Skeleton")));
 
 	USkeletalMesh* SkeletalMesh = NewObject<USkeletalMesh>(
-		BlastMesh, FName(*InSourceStaticMesh->GetName().Append(TEXT("_SkelMesh"))), RF_Public);
+		BlastMesh, FName(*InSourceStaticMesh.GetName().Append(TEXT("_SkelMesh"))), RF_Public);
 
 	ProcessImportMeshSkeleton(SkeletalMesh, FractureSession);
 
 	FSkeletalMeshModel& ImportedResource = *SkeletalMesh->GetImportedModel();
 	ImportedResource.LODModels.Empty();
 
-	bool bBuildSuccess = FStaticToSkeletalMeshConverter::InitializeSkeletalMeshFromStaticMesh(SkeletalMesh, InSourceStaticMesh, SkeletalMesh->GetRefSkeleton(), NAME_None);
+	bool bBuildSuccess = FStaticToSkeletalMeshConverter::InitializeSkeletalMeshFromStaticMesh(SkeletalMesh, &InSourceStaticMesh, SkeletalMesh->GetRefSkeleton(), NAME_None);
 	if (bBuildSuccess)
 	{
 		// Update the skeletal mesh and the skeleton so that their ref skeletons are in sync and the skeleton's preview mesh
@@ -533,7 +533,7 @@ void CreateSkeletalMeshFromAuthoring(TSharedPtr<FFractureSession> FractureSessio
 		TArray<FSkeletalMaterial> ExistingMaterials;
 		TMap<int32, int32> InteriorMaterialsToSlots;
 
-		for (auto& mat : InSourceStaticMesh->GetStaticMaterials())
+		for (const FStaticMaterial& mat : InSourceStaticMesh.GetStaticMaterials())
 		{
 			FSkeletalMaterial NewMat(mat.MaterialInterface);
 			NewMat.MaterialSlotName = mat.MaterialSlotName;
@@ -598,8 +598,7 @@ void CreateSkeletalMeshFromAuthoring(TSharedPtr<FFractureSession> FractureSessio
 }
 
 
-void CreateSkeletalMeshFromAuthoring(TSharedPtr<FFractureSession> FractureSession, bool isFinal,
-                                     UMaterialInterface* InteriorMaterial)
+void CreateSkeletalMeshFromAuthoring(TSharedPtr<FFractureSession> FractureSession, UMaterialInterface* InteriorMaterial)
 {
 	USkeletalMesh* SkeletalMesh = FractureSession->BlastMesh->Mesh;
 	check(SkeletalMesh);
@@ -670,11 +669,6 @@ void CreateSkeletalMeshFromAuthoring(TSharedPtr<FFractureSession> FractureSessio
 	FinalizeMeshCreation(SkeletalMesh);
 
 	FractureSession->IsMeshCreatedFromFractureData = true;
-}
-
-void UpdateSkeletalMeshFromAuthoring(TSharedPtr<FFractureSession> FractureSession, UMaterialInterface* InteriorMaterial)
-{
-	CreateSkeletalMeshFromAuthoring(FractureSession, false, InteriorMaterial);
 }
 
 #undef LOCTEXT_NAMESPACE

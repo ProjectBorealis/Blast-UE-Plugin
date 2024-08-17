@@ -34,6 +34,7 @@ void SSelectStaticMeshDialog::Construct(const FArguments& InArgs)
 {
 	FDetailsViewArgs Args;
 	Args.bLockable = false;
+	Args.bAllowSearch = false;
 	Args.bHideSelectionTip = true;
 	FPropertyEditorModule& PropertyModule = FModuleManager::LoadModuleChecked<FPropertyEditorModule>("PropertyEditor");
 	StaticMeshHolder = NewObject<UBlastStaticMeshHolder>();
@@ -148,6 +149,7 @@ void SFixChunkHierarchyDialog::Construct(const FArguments& InArgs)
 {
 	FDetailsViewArgs Args;
 	Args.bLockable = false;
+	Args.bAllowSearch = false;
 	Args.bHideSelectionTip = true;
 	FPropertyEditorModule& PropertyModule = FModuleManager::LoadModuleChecked<FPropertyEditorModule>("PropertyEditor");
 	Properties = NewObject<UBlastFixChunkHierarchyProperties>();
@@ -238,6 +240,117 @@ bool SFixChunkHierarchyDialog::ShowWindow(TSharedPtr<FBlastFracture> Fracturer,
 	}
 	return FixChunkHierarchyDialog->IsFix;
 }
+
+//////////////////////////////////////////////////////////////////////////
+// SExportAssetToFileDialog
+//////////////////////////////////////////////////////////////////////////
+
+// Constructs this widget with InArgs
+void SBlastRootImportSettingsDialog::Construct(const FArguments& InArgs)
+{
+	FDetailsViewArgs Args;
+	Args.bLockable = false;
+	Args.bAllowSearch = false;
+	Args.bHideSelectionTip = true;
+	FPropertyEditorModule& PropertyModule = FModuleManager::LoadModuleChecked<FPropertyEditorModule>("PropertyEditor");
+	ImportSettingsHolder = NewObject<UBlastImportSettings>();
+	SettingsView = PropertyModule.CreateDetailView(Args);
+	SettingsView->SetObject(ImportSettingsHolder);
+	ChildSlot
+	[
+		SNew(SBorder)
+		.Padding(FMargin(0.0f, 3.0f, 1.0f, 0.0f))
+		[
+			SNew(SVerticalBox)
+
+			+ SVerticalBox::Slot()
+			  .Padding(2.0f)
+			  .AutoHeight()
+			[
+				SettingsView->AsShared()
+			]
+
+			+ SVerticalBox::Slot()
+			  .Padding(2.0f)
+			  .HAlign(HAlign_Right)
+			  .AutoHeight()
+			[
+				SNew(SUniformGridPanel)
+				.SlotPadding(2)
+				+ SUniformGridPanel::Slot(0, 0)
+				[
+					SNew(SButton)
+										.Text(FText::FromString("Import"))
+										.OnClicked(this, &SBlastRootImportSettingsDialog::ImportClicked)
+				]
+				+ SUniformGridPanel::Slot(1, 0)
+				[
+					SNew(SButton)
+										.Text(FText::FromString("Cancel"))
+										.OnClicked(this, &SBlastRootImportSettingsDialog::CancelClicked)
+				]
+			]
+		]
+	];
+}
+
+FReply SBlastRootImportSettingsDialog::ImportClicked()
+{
+	bLoadConfirmed = true;
+	CloseContainingWindow();
+	return FReply::Handled();
+}
+
+FReply SBlastRootImportSettingsDialog::CancelClicked()
+{
+	CloseContainingWindow();
+	return FReply::Handled();
+}
+
+void SBlastRootImportSettingsDialog::CloseContainingWindow()
+{
+	TSharedPtr<SWindow> ContainingWindow = FSlateApplication::Get().FindWidgetWindow(AsShared());
+	if (ContainingWindow.IsValid())
+	{
+		ContainingWindow->RequestDestroyWindow();
+	}
+}
+
+TOptional<SBlastRootImportSettingsDialog::FImportSettingsResult> SBlastRootImportSettingsDialog::ShowWindow()
+{
+	const FText TitleText = NSLOCTEXT("BlastMeshEditor", "BlastMeshEditor_ImportSettings", "Import settings");
+	// Create the window to pick the class
+	TSharedRef<SWindow> SelectStaticMeshWindow = SNew(SWindow)
+		.Title(TitleText)
+		.SizingRule(ESizingRule::Autosized)
+		.AutoCenter(EAutoCenter::PreferredWorkArea)
+		.SupportsMinimize(false);
+
+	TSharedRef<SBlastRootImportSettingsDialog> ImportSettingsDialog = SNew(SBlastRootImportSettingsDialog);
+	SelectStaticMeshWindow->SetContent(ImportSettingsDialog);
+	TSharedPtr<SWindow> RootWindow = FGlobalTabmanager::Get()->GetRootWindow();
+	if (RootWindow.IsValid())
+	{
+		FSlateApplication::Get().AddModalWindow(SelectStaticMeshWindow, RootWindow.ToSharedRef());
+	}
+	else
+	{
+		//assert here?
+	}
+
+	if (!ImportSettingsDialog->bLoadConfirmed)
+	{
+		return {};
+	}
+
+	FImportSettingsResult Ret;
+	Ret.bCleanMesh = ImportSettingsDialog->ImportSettingsHolder->bCleanMesh;
+	return Ret;
+}
+
+//////////////////////////////////////////////////////////////////////////
+// SExportAssetToFileDialog
+//////////////////////////////////////////////////////////////////////////
 
 bool SExportAssetToFileDialog::ShowWindow(TSharedPtr<FBlastFracture> Fracturer,
                                           UBlastFractureSettings* FractureSettings)
@@ -483,6 +596,7 @@ void SRebuildCollisionMeshDialog::Construct(const FArguments& InArgs)
 {
 	FDetailsViewArgs Args;
 	Args.bLockable = false;
+	Args.bAllowSearch = false;
 	Args.bHideSelectionTip = true;
 	FPropertyEditorModule& PropertyModule = FModuleManager::LoadModuleChecked<FPropertyEditorModule>("PropertyEditor");
 	Properties = NewObject<UBlastRebuildCollisionMeshProperties>();
@@ -585,6 +699,7 @@ void SCopyCollisionMeshToChunkDialog::Construct(const FArguments& InArgs)
 {
 	FDetailsViewArgs Args;
 	Args.bLockable = false;
+	Args.bAllowSearch = false;
 	Args.bHideSelectionTip = true;
 	FPropertyEditorModule& PropertyModule = FModuleManager::LoadModuleChecked<FPropertyEditorModule>("PropertyEditor");
 	Properties = NewObject<UBlastStaticMeshCopyCollisionProperties>();

@@ -1,12 +1,6 @@
 // Copyright 1998-2017 Epic Games, Inc. All Rights Reserved.
 
 #include "BlastFracture.h"
-#include "BlastFractureSettings.h"
-#include "BlastMeshEditorModule.h"
-#include "BlastMesh.h"
-#include "BlastMeshFactory.h"
-#include "BlastMeshUtilities.h"
-#include "BlastGlobals.h"
 
 #include "blast-sdk/extensions/authoringCommon/NvBlastExtAuthoringTypes.h"
 #include "blast-sdk/extensions/authoringCommon/NvBlastExtAuthoringConvexMeshBuilder.h"
@@ -30,8 +24,16 @@
 #include "RawMesh.h"
 #include "Engine/Texture2D.h"
 #include "MeshDescriptionOperations.h"
-
 #include "Chaos/Convex.h"
+
+#include "BlastFractureSettings.h"
+#include "BlastMeshEditorModule.h"
+#include "BlastMesh.h"
+#include "BlastMeshFactory.h"
+#include "BlastMeshUtilities.h"
+#include "BlastGlobals.h"
+#include "BlastMeshImporter.h"
+#include "BlastMeshImporterFbxReader.h"
 
 #define LOCTEXT_NAMESPACE "BlastMeshEditor"
 
@@ -268,6 +270,25 @@ UBlastFractureSettings* FBlastFracture::CreateFractureSettings(class FBlastMeshE
 	return Settings;
 }
 
+TSharedPtr<FFractureSession> FBlastFracture::StartFractureSessionInternal(UBlastMesh* InBlastMesh)
+{
+	FScopeLock Lock(&ExclusiveFractureSection);
+
+	TSharedPtr<FFractureSession> FractureSession = MakeShareable(new FFractureSession());
+	FractureSession->FractureTool = TSharedPtr<Nv::Blast::FractureTool>(NvBlastExtAuthoringCreateFractureTool(),
+																		[](Nv::Blast::FractureTool* p)
+																		{
+																			p->release();
+																		});
+	FractureSession->BlastMesh = InBlastMesh;
+	if (!FractureSession->FractureTool.IsValid() || InBlastMesh == nullptr)
+	{
+		return nullptr;
+	}
+
+	return FractureSession;
+}
+
 TSharedPtr<FFractureSession> FBlastFracture::StartFractureSession(UBlastMesh* InBlastMesh,
                                                                   UStaticMesh* InSourceStaticMesh, bool bCleanMesh,
                                                                   UBlastFractureSettings* Settings,
@@ -275,14 +296,8 @@ TSharedPtr<FFractureSession> FBlastFracture::StartFractureSession(UBlastMesh* In
 {
 	FScopeLock Lock(&ExclusiveFractureSection);
 
-	TSharedPtr<FFractureSession> FractureSession = MakeShareable(new FFractureSession());
-	FractureSession->FractureTool = TSharedPtr<Nv::Blast::FractureTool>(NvBlastExtAuthoringCreateFractureTool(),
-	                                                                    [](Nv::Blast::FractureTool* p)
-	                                                                    {
-		                                                                    p->release();
-	                                                                    });
-	FractureSession->BlastMesh = InBlastMesh;
-	if (!FractureSession->FractureTool.IsValid() || InBlastMesh == nullptr)
+	TSharedPtr<FFractureSession> FractureSession = StartFractureSessionInternal(InBlastMesh);
+	if (!FractureSession)
 	{
 		UE_LOG(LogBlastMeshEditor, Error, TEXT("Failed to start fracture session"));
 		return nullptr;
@@ -344,7 +359,7 @@ TSharedPtr<FFractureSession> FBlastFracture::StartFractureSession(UBlastMesh* In
 	{
 		FBlastScopedProfiler LFTSP("Load fracture tool state");
 		FBlastFractureToolData& FTD = InBlastMesh->FractureHistory.GetCurrentToolData();
-		const int32 SupportLevel = Settings->bDefaultSupportDepth ? Settings->DefaultSupportDepth : -1;
+		const int32 SupportLevel = Settings && Settings->bDefaultSupportDepth ? Settings->DefaultSupportDepth : -1;
 		const uint32 ChunkCount = FTD.ChunkMeshes.Num();
 
 		if (ForceLoadFracturedMesh || (ChunkCount == InBlastMesh->GetChunkCount() && ChunkCount))
@@ -437,7 +452,7 @@ void FBlastFracture::FinishFractureSession(FFractureSessionPtr FractureSession)
 				FS->BlastMesh->Mesh->ReleaseResources();
 				FS->BlastMesh->Mesh->ReleaseResourcesFence.Wait();
 			}
-			CreateSkeletalMeshFromAuthoring(FS, true, nullptr);
+			CreateSkeletalMeshFromAuthoring(FS, nullptr);
 
 			FS->BlastMesh->RebuildIndexToBoneNameMap();
 			FS->BlastMesh->RebuildCookedBodySetupsIfRequired(true);
@@ -523,6 +538,117 @@ void FBlastFracture::Redo(UBlastFractureSettings* Settings)
 	FinishFractureSession(Settings->FractureSession);
 	BlastMesh->FractureHistory.Redo();
 	Settings->FractureSession = StartFractureSession(BlastMesh, nullptr, false, Settings, true);
+}
+
+Nv::Blast::Mesh* CreateMeshFromImportedData(const FMeshData& MeshData, bool bClean)
+{
+	Nv::Blast::Mesh* mesh = NvBlastExtAuthoringCreateMesh(MeshData.Verts.GetData(), MeshData.Normals.GetData(), MeshData.UVs.GetData(), MeshData.Verts.Num(), MeshData.Indices.GetData(), MeshData.Indices.Num());
+
+	if (mesh)
+	{
+		mesh->setMaterialId(MeshData.MaterialIDs.GetData());
+		mesh->setSmoothingGroup(MeshData.SmoothingGroups.GetData());
+		
+		if (bClean)
+		{
+			Nv::Blast::MeshCleaner* cleaner = NvBlastExtAuthoringCreateMeshCleaner();
+			Nv::Blast::Mesh* nmesh = cleaner->cleanMesh(mesh);
+			cleaner->release();
+			if (nmesh)
+			{
+				mesh->release();
+				mesh = nmesh;
+			}
+		}
+	}
+
+	return mesh;
+}
+
+void AddMeshToGraph(Nv::Blast::FractureTool* FractureTool, const FImportedMeshData& Imported, bool bClean, int32 Idx, int32 ParentChunkId = -1)
+{
+	if (Imported.Chunks[Idx].Indices.IsEmpty())
+	{
+		return;
+	}
+	
+	Nv::Blast::Mesh* Mesh = CreateMeshFromImportedData(Imported.Chunks[Idx], bClean);
+	if (!Mesh)
+	{
+		UE_LOG(LogBlastMeshEditor, Error, TEXT("Failed to generate blast mesh for chunk %d from imported data."), Idx);
+		return;
+	}
+	
+	int32 AddedChunkId = FractureTool->setChunkMesh(Mesh, ParentChunkId);
+	if (ParentChunkId != -1)
+	{
+		FractureTool->setApproximateBonding(FractureTool->getChunkInfoIndex(AddedChunkId), true);
+	}
+	
+	const TArray<int32> Children = Imported.GetListOfChildren(Idx);
+	for (int32 ChildIdx : Children)
+	{
+		AddMeshToGraph(FractureTool, Imported, bClean, ChildIdx, AddedChunkId);
+	}
+}
+
+bool FBlastFracture::ImportRootChunk(UBlastMesh* InBlastMesh, UBlastFractureSettings* Settings, const FString& InFilePath, bool bCleanMesh)
+{
+	TSharedPtr<IBlastMeshFileReader> fileReader;
+	if (FPaths::GetExtension(InFilePath).Equals(TEXT("FBX"), ESearchCase::IgnoreCase))
+	{
+		fileReader = MakeShared<Nv::Blast::FbxFileReader>();
+	}
+	else
+	{
+		UE_LOG(LogBlastMeshEditor, Error, TEXT("Import done with unknown file extension %s"), *FPaths::GetExtension(InFilePath));
+		return false;
+	}
+
+	FScopedSlowTask SlowTask(2 + (bCleanMesh ? 5 : 0), LOCTEXT("CreateBlastMeshesFromFBX", "Importing FBX mesh..."));
+	SlowTask.EnterProgressFrame(1.f);
+
+	// Load the asset
+	const FImportedMeshData MeshData = fileReader->LoadFromFile(InFilePath);
+	
+	if (MeshData.Chunks.IsEmpty())
+	{
+		UE_LOG(LogBlastMeshEditor, Error, TEXT("Could not import mesh from %s. No chunks found."), *InFilePath);
+		return false;
+	}
+	
+	SlowTask.EnterProgressFrame(1.f, LOCTEXT("CreateBlastMeshesFromFBX", "Creating chunks..."));
+
+	if (Settings->FractureSession.IsValid())
+	{
+		FinishFractureSession(Settings->FractureSession);
+		Settings->Reset();
+	}
+
+	Settings->FractureSession = StartFractureSessionInternal(InBlastMesh);
+	if (!Settings->FractureSession)
+	{
+		UE_LOG(LogBlastMeshEditor, Error, TEXT("Failed to start fracture session"));
+		return false;
+	}
+
+	// this bad boi is recursive
+	AddMeshToGraph(Settings->FractureSession->FractureTool.Get(), MeshData, bCleanMesh, 0);
+
+	Settings->FractureSession->IsMeshModified = true;
+	LoadFracturedMesh(Settings->FractureSession, -1);
+
+	//need this to force saving fracture tool state
+	Settings->FractureSession->IsRootFractured = true;
+	Settings->FractureSession->IsMeshCreatedFromFractureData = true;
+	
+	if (Settings)
+	{
+		PopulateSettingsFromBlastMesh(Settings, Settings->FractureSession->BlastMesh);
+	}
+
+	FinishFractureSession(Settings->FractureSession);
+	return true;
 }
 
 void FBlastFracture::Fracture(UBlastFractureSettings* Settings, TSet<int32>& SelectedChunkIndices,
@@ -910,8 +1036,11 @@ void FBlastFracture::ReloadGraphicsMesh(FFractureSessionPtr FractureSession, int
 				                                   DefaultSupportDepth),
 				[](Nv::Blast::AuthoringResult* p)
 				{
-					FCollisionBuilder CollisionBuilder;
-					NvBlastExtAuthoringReleaseAuthoringResult(CollisionBuilder, p);
+					if (p)
+					{
+						FCollisionBuilder CollisionBuilder;
+						NvBlastExtAuthoringReleaseAuthoringResult(CollisionBuilder, p);
+					}
 				});
 		}
 		BondGenerator->release();
@@ -943,7 +1072,7 @@ void FBlastFracture::ReloadGraphicsMesh(FFractureSessionPtr FractureSession, int
 		BlastMesh->Mesh->ReleaseResources();
 		BlastMesh->Mesh->ReleaseResourcesFence.Wait();
 	}
-	CreateSkeletalMeshFromAuthoring(FS, false, InteriorMaterial);
+	CreateSkeletalMeshFromAuthoring(FS, InteriorMaterial);
 
 	BlastMesh->RebuildIndexToBoneNameMap();
 	BlastMesh->PostLoad();
@@ -969,8 +1098,11 @@ bool FBlastFracture::LoadFractureData(FFractureSessionPtr FractureSession, int32
 			                                   DefaultSupportDepth),
 			[](Nv::Blast::AuthoringResult* p)
 			{
-				FCollisionBuilder CollisionBuilder;
-				NvBlastExtAuthoringReleaseAuthoringResult(CollisionBuilder, p);
+				if (p)
+				{
+					FCollisionBuilder CollisionBuilder;
+					NvBlastExtAuthoringReleaseAuthoringResult(CollisionBuilder, p);
+				}
 			});
 	}
 	BondGenerator->release();
@@ -1051,9 +1183,9 @@ void FBlastFracture::LoadFracturedMesh(FFractureSessionPtr FractureSession, int3
 	TArray<FSkeletalMaterial> ExistingMaterials;
 	UFbxSkeletalMeshImportData* SkelMeshImportData = nullptr;
 
-	if (InSourceStaticMesh != nullptr)
+	if (InSourceStaticMesh)
 	{
-		CreateSkeletalMeshFromAuthoring(FS, InSourceStaticMesh);
+		CreateSkeletalMeshFromAuthoring(FS, *InSourceStaticMesh);
 	}
 	else
 	{
@@ -1061,7 +1193,7 @@ void FBlastFracture::LoadFracturedMesh(FFractureSessionPtr FractureSession, int3
 
 		SkelMeshImportData = Cast<UFbxSkeletalMeshImportData>(BlastMesh->Mesh->GetAssetImportData());
 
-		UpdateSkeletalMeshFromAuthoring(FS, InteriorMaterial);
+		CreateSkeletalMeshFromAuthoring(FS, InteriorMaterial);
 	}
 
 	if (FS->IsMeshModified)
@@ -1344,7 +1476,7 @@ bool FBlastFracture::FractureCutout(TSharedPtr<FFractureSession> FractureSession
 	{
 		CutoutConfig.cutoutSet = NvBlastExtAuthoringCreateCutoutSet();
 
-		TArray64<uint8_t> Buf;
+		TArray64<uint8> Buf;
 		FImage Img;
 		Pattern->Source.GetMipImage(Img, 0);
 		int32 sz = Pattern->Source.GetSizeX() * Pattern->Source.GetSizeY();

@@ -111,6 +111,8 @@ public:
 
 	void Redo(UBlastFractureSettings* Settings);
 
+	bool ImportRootChunk(UBlastMesh* InSourceBlastMesh, UBlastFractureSettings* Settings, const FString& InFilePath, bool bCleanMesh);
+
 	const static FName InteriorMaterialID;
 
 private:
@@ -180,6 +182,8 @@ private:
 	FCriticalSection ExclusiveFractureSection;
 
 	TObjectPtr<UBlastFractureSettingsConfig> Config;
+	
+	TSharedPtr<FFractureSession> StartFractureSessionInternal(UBlastMesh* InSourceBlastMesh);
 
 	virtual void AddReferencedObjects(FReferenceCollector& Collector) override
 	{

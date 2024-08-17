@@ -25,6 +25,7 @@ void FBlastMeshEditorCommands::RegisterCommands()
 	UI_COMMAND( FixChunkHierarchy, "Optimize", "Tries to unite chunks and build optimized hierarchy for better Blast runtime performance.", EUserInterfaceActionType::Button, FInputChord() );
 	//UI_COMMAND( Refresh, "Refresh", "Refreshes the BlastMesh from the StaticMesh it was created from.", EUserInterfaceActionType::Button, FInputChord() );
 	UI_COMMAND( ImportRootFromStaticMesh, "Import", "Imports root chunk from static mesh.", EUserInterfaceActionType::Button, FInputChord() );
+	UI_COMMAND( ImportRootFromFbx, "Import FBX", "Imports root chunk from fbx.", EUserInterfaceActionType::Button, FInputChord() );
 	UI_COMMAND(FitUvCoordinates, "FitUVs", "Fit uv coordinates to given square.", EUserInterfaceActionType::Button, FInputChord());
 	UI_COMMAND(ChunksFromIslands, "Islands to chunks", "Converts islands to separate chunks.", EUserInterfaceActionType::Button, FInputChord());
 	UI_COMMAND(RebuildCollisionMesh, "Collision", "Rebuild collision mesh.", EUserInterfaceActionType::Button, FInputChord());

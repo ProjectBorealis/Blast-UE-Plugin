@@ -131,6 +131,10 @@ private:
 
 	/** Callback for import root from static mesh */
 	void ImportRootFromStaticMesh();
+	
+	/** Callback for import root from fbx */
+	void ImportRootFromFBX(const FString& InFilePath, bool bCleanMesh);
+	void ImportRootFromFBXDialog();
 
 	/** Callback to check if the Blast mesh root can be imported from static mesh. */
 	bool CanImportRootFromStaticMesh();

@@ -600,7 +600,7 @@ USkeletalMesh* UBlastMeshFactory::ImportSkeletalMesh(UBlastMesh* BlastMesh, FNam
 					Args.Add(TEXT("ArrayLength"), SkelMeshArray.Num());
 					SlowTask.EnterProgressFrame(0, GetImportTaskText(FText::Format(NSLOCTEXT("UnrealEd", "Importingf", "Importing ({NodeIndex} of {ArrayLength})"), Args)));
 
-					UnFbx::FFbxImporter::UpdateSkeletalMeshImportData(BaseSkeletalMesh, ImportUI->FBXImportUI->SkeletalMeshImportData, INDEX_NONE, nullptr, nullptr);
+					// UnFbx::FFbxImporter::UpdateSkeletalMeshImportData(BaseSkeletalMesh, ImportUI->FBXImportUI->SkeletalMeshImportData, INDEX_NONE, nullptr, nullptr);
 
 					if (NewMesh == nullptr)
 					{

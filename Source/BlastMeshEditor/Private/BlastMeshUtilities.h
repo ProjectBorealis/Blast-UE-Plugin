@@ -31,10 +31,6 @@ Nv::Blast::Mesh* CreateAuthoringMeshFromRenderData(const FStaticMeshRenderData& 
                                                    const TMap<FName, int32>& MaterialMap,
                                                    const FTransform3f& UE4ToBlastTransform);
 
-void CreateSkeletalMeshFromAuthoring(TSharedPtr<FFractureSession> FractureSession, UStaticMesh* SourceMesh);
+void CreateSkeletalMeshFromAuthoring(TSharedPtr<FFractureSession> FractureSession, const UStaticMesh& SourceMesh);
 
-void CreateSkeletalMeshFromAuthoring(TSharedPtr<FFractureSession> FractureSession, bool isFinal,
-                                     UMaterialInterface* InteriorMaterial);
-
-void UpdateSkeletalMeshFromAuthoring(TSharedPtr<FFractureSession> FractureSession,
-                                     UMaterialInterface* InteriorMaterial);
+void CreateSkeletalMeshFromAuthoring(TSharedPtr<FFractureSession> FractureSession, UMaterialInterface* InteriorMaterial);

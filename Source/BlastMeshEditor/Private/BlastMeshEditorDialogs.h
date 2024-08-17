@@ -3,9 +3,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "BlastMeshEditor.h"
 #include "Widgets/Input/SButton.h"
 #include "IDetailsView.h"
+
+#include "BlastMeshEditor.h"
 
 //////////////////////////////////////////////////////////////////////////
 // SSelectStaticMeshDialog
@@ -72,6 +73,39 @@ public:
 	TSharedPtr<IDetailsView> PropertyView;
 	TObjectPtr<class UBlastFixChunkHierarchyProperties> Properties;
 	bool IsFix = false;
+};
+
+//////////////////////////////////////////////////////////////////////////
+// SBlastRootImportSettingsDialog
+//////////////////////////////////////////////////////////////////////////
+
+class SBlastRootImportSettingsDialog : public SCompoundWidget
+{
+public:
+	SLATE_BEGIN_ARGS(SBlastRootImportSettingsDialog)
+	{
+	}
+	SLATE_END_ARGS()
+
+	// Constructs this widget with InArgs
+	void Construct(const FArguments& InArgs);
+
+	FReply ImportClicked();
+	FReply CancelClicked();
+
+	// Show the dialog, returns true if successfully edited fracture script
+	struct FImportSettingsResult
+	{
+		bool bCleanMesh = false;
+	};
+
+	static TOptional<FImportSettingsResult> ShowWindow();
+
+	void CloseContainingWindow();
+
+	TSharedPtr<IDetailsView> SettingsView;
+	TObjectPtr<class UBlastImportSettings> ImportSettingsHolder;
+	bool bLoadConfirmed = false;
 };
 
 //////////////////////////////////////////////////////////////////////////

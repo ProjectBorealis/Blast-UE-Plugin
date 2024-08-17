@@ -25,11 +25,12 @@
 //
 // Copyright (c) 2017 NVIDIA Corporation. All rights reserved.
 
-#include "BlastMeshExporterFbxUtils.h"
+#include "BlastMeshFbxUtils.h"
 
 #include "NvBlastExtAuthoringTypes.h"
 #include <sstream>
 
+DEFINE_LOG_CATEGORY(LogBlastIO);
 
 void FbxUtils::VertexToFbx(const Nv::Blast::Vertex& vert, FbxVector4& outVertex, FbxVector4& outNormal, FbxVector2& outUV)
 {

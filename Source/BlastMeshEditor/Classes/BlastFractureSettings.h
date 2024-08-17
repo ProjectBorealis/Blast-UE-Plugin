@@ -281,17 +281,23 @@ class UBlastStaticMeshCopyCollisionProperties : public UObject
 };
 
 UCLASS()
-class UBlastStaticMeshHolder : public UObject
+class UBlastImportSettings : public UObject
+{
+	GENERATED_UCLASS_BODY()
+
+	// If true, will attempt to clean up the mesh to be better suited for Blast
+	// Avoid this setting for hollow meshes
+	UPROPERTY(EditAnywhere, Category = Import, Transient)
+	bool bCleanMesh = false;
+};
+
+UCLASS()
+class UBlastStaticMeshHolder : public UBlastImportSettings
 {
 	GENERATED_UCLASS_BODY()
 
 	UPROPERTY(EditAnywhere, Category = Import, Transient)
 	TObjectPtr<class UStaticMesh> StaticMesh;
-
-	// If true, will attempt to clean up the mesh to be better suited for Blast
-	// Avoid this setting for hollow meshes
-	UPROPERTY(EditAnywhere, Category = Import, Transient)
-	bool bCleanMesh = true;
 
 	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& e) override;
 
