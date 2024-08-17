@@ -503,12 +503,16 @@ USkeletalMesh* UBlastMeshFactory::ImportSkeletalMesh(UBlastMesh* BlastMesh, FNam
 					bool bMapMorphTargetToTimeZero = false;
 					if (LODIndex == 0 && SkelMeshNodeArray.Num() != 0)
 					{
-						FName OutputName = FbxImporter->MakeNameForMesh(skelMeshName.ToString(), SkelMeshNodeArray[0]);
+						FString Name = skelMeshName.ToString();
+						if (SkelMeshNodeArray.Num() > 0)
+						{
+							Name = Name + "_" + FString::FromInt(i);
+						}
 
 						UnFbx::FFbxImporter::FImportSkeletalMeshArgs ImportSkeletalMeshArgs;
 						ImportSkeletalMeshArgs.InParent = BlastMesh;
 						ImportSkeletalMeshArgs.NodeArray = SkelMeshNodeArray;
-						ImportSkeletalMeshArgs.Name = OutputName;
+						ImportSkeletalMeshArgs.Name = Name;
 						ImportSkeletalMeshArgs.Flags = RF_NoFlags;
 						ImportSkeletalMeshArgs.TemplateImportData = ImportUI->FBXImportUI->SkeletalMeshImportData;
 						ImportSkeletalMeshArgs.LodIndex = LODIndex;
