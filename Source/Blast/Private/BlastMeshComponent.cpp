@@ -352,6 +352,7 @@ void UBlastMeshComponent::UninitBlastFamily()
 	for (int32 ActorIndex = BlastActorsBeginLive; ActorIndex < BlastActorsEndLive; ActorIndex++)
 	{
 		FActorData& ActorData = BlastActors[ActorIndex];
+		
 		if (ActorData.BodyInstance)
 		{
 			ActorData.BodyInstance->TermBody();
@@ -362,6 +363,13 @@ void UBlastMeshComponent::UninitBlastFamily()
 			GetWorld()->GetTimerManager().ClearTimer(ActorData.TimerHandle);
 			ActorData.TimerHandle.Invalidate();
 		}
+
+		if (ActorData.BlastActor)
+		{
+			NvBlastActorDeactivate(ActorData.BlastActor, Nv::Blast::logLL);
+			ActorData.BlastActor = nullptr;
+		}
+		
 		ActorData = FActorData();
 	}
 	DebrisCount = 0;
@@ -977,7 +985,7 @@ bool UBlastMeshComponent::SyncChunksAndBodies()
 
 			UpdateDebris(ActorIndex, BodyWT, &Lock);
 
-			if (!BodyWT.Equals(ActorData.PreviousBodyWorldTransform))
+			if (!ActorData.PreviousBodyWorldTransform || !BodyWT.Equals(ActorData.PreviousBodyWorldTransform.GetValue()))
 			{
 				bAnyBodiesChanged = true;
 				ActorData.PreviousBodyWorldTransform = BodyWT;
@@ -1248,8 +1256,9 @@ void UBlastMeshComponent::RebuildChunkVisibility()
 		}
 	}
 
-	bBoneVisibilityDirty = true;
 	bChunkVisibilityChanged = false;
+	bBoneVisibilityDirty = true;
+	bNeedToFlipSpaceBaseBuffers = true;
 
 #if !(UE_BUILD_SHIPPING || UE_BUILD_TEST)
 	// Send visible chunks to render thread for collision debug render 
@@ -1327,11 +1336,7 @@ void UBlastMeshComponent::OnRegister()
 	if (BlastMesh)
 	{
 		ChunkVisibility.Init(false, BlastMesh->GetChunkCount());
-		ChunkToActorIndex.SetNumUninitialized(BlastMesh->GetChunkCount());
-		for (int32 C = 0; C < ChunkToActorIndex.Num(); C++)
-		{
-			ChunkToActorIndex[C] = INDEX_NONE;
-		}
+		ChunkToActorIndex.Init(INDEX_NONE, BlastMesh->GetChunkCount());
 
 		//Show the root chunks for preview even if the physics is not created
 		ShowRootChunks();
@@ -1640,6 +1645,18 @@ void UBlastMeshComponent::FinalizeBoneTransform()
 	}
 	
 	Super::FinalizeBoneTransform();
+}
+
+bool UBlastMeshComponent::IsSimulatingPhysics(FName BoneName) const
+{
+	// We respond based on either the body (if a bone is specified), or the root body (if no bone is
+	// specified, and the component is controlled by simulation).
+	FBodyInstance* BI = GetBodyInstance(BoneName);
+	if (BI)
+	{
+		return BI->IsInstanceSimulatingPhysics();
+	}
+	return false;
 }
 
 void UBlastMeshComponent::SetBlastMesh(UBlastMesh* NewBlastMesh)
@@ -2186,8 +2203,8 @@ bool UBlastMeshComponent::HandlePostDamage(NvBlastActor* actor, FName DamageType
 	TArray<NvBlastActor*> newActorsBuffer;
 	newActorsBuffer.SetNum(chunkCount);
 
-	TArray<char> splitScratch;
-	splitScratch.SetNum(NvBlastActorGetRequiredScratchForSplit(actor, Nv::Blast::logLL));
+	TArray<uint8> splitScratch;
+	splitScratch.SetNum(NvBlastActorGetRequiredScratchForSplit(actor, Nv::Blast::logLL) + 0x10); // add 16 to ensure alignment doesn't cause overwrites
 
 	NvBlastActorSplitEvent splitEvent;
 	splitEvent.newActors = newActorsBuffer.GetData();
@@ -2413,11 +2430,6 @@ void UBlastMeshComponent::UpdateFractureBufferSize()
 
 	FBlastFractureScratch::getInstance().ensureFractureBuffersSize(BlastAsset->GetChunkCount(),
 	                                                               BlastAsset->GetBondCount());
-}
-
-bool UBlastMeshComponent::IsSimulatingPhysics(FName BoneName /*= NAME_None*/) const
-{
-	return true;
 }
 
 void UBlastMeshComponent::AddRadialImpulse(FVector Origin, float Radius, float Strength,
@@ -3372,7 +3384,7 @@ struct NvBlastActor* UBlastMeshComponent::CreateFirstActor()
 	ActorDesc.initialBondHealths = nullptr;
 	ActorDesc.initialSupportChunkHealths = nullptr;
 	TArray<uint8> Scratch;
-	Scratch.SetNumUninitialized(NvBlastFamilyGetRequiredScratchForCreateFirstActor(BlastFamily.Get(), Nv::Blast::logLL));
+	Scratch.SetNumUninitialized(NvBlastFamilyGetRequiredScratchForCreateFirstActor(BlastFamily.Get(), Nv::Blast::logLL) + 0x10); // add 16 to ensure alignment bumping doesn't overwrite
 	return NvBlastFamilyCreateFirstActor(BlastFamily.Get(), &ActorDesc, Scratch.GetData(), Nv::Blast::logLL);
 }
 

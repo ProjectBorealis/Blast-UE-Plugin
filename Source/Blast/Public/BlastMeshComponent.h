@@ -713,7 +713,7 @@ protected:
 	{
 		struct NvBlastActor* BlastActor;
 		FBodyInstance* BodyInstance;
-		FTransform PreviousBodyWorldTransform;
+		TOptional<FTransform> PreviousBodyWorldTransform;
 		TArray<FActorChunkData, TInlineAllocator<1>> Chunks;
 		bool bIsAttachedToComponent;
 		FTimerHandle TimerHandle;
