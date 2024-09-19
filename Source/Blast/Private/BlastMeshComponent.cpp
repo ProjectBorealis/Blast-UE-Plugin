@@ -2659,9 +2659,17 @@ void UBlastMeshComponent::InitBodyForActor(FActorData& ActorData, uint32 ActorIn
 	const TArray<FBlastCookedChunkData>& CookedData = BlastMesh->GetCookedChunkData_AssumeUpToDate();
 	const NvBlastChunk* ChunkData = NvBlastAssetGetChunks(BlastAsset->GetLoadedAsset(), Nv::Blast::logLL);
 
+	float TotalVolume = 0.f;
+	const int32 ChunkCount = NvBlastAssetGetChunkCount(BlastAsset->GetLoadedAsset(), Nv::Blast::logLL);
+	for (int32 Idx = 1; Idx < FMath::Min(ChunkCount, BlastMesh->ChunkMeshVolumes.Num()); ++Idx)
+	{ 
+		TotalVolume += BlastMesh->ChunkMeshVolumes[Idx];
+	}
+	
 	bool bContainsRootChunks = false;
 	bool bIsKinematicActor = bIsFirstActor && bIsInitiallyKinematic;
 	bool bIsAllLeafChunks = true;
+	float ThisChunkVolume = 0.f;
 	for (int32 i = 0; i < VisibleChunks.Num(); i++)
 	{
 		const uint32 ChunkIndex = VisibleChunks[i].ChunkIndex;
@@ -2675,6 +2683,11 @@ void UBlastMeshComponent::InitBodyForActor(FActorData& ActorData, uint32 ActorIn
 		else
 		{
 			CookedData[ChunkIndex].AppendToBodySetup(NewBodySetup);
+		}
+		
+		if (BlastMesh->ChunkMeshVolumes.IsValidIndex(ChunkIndex))
+		{
+			ThisChunkVolume += BlastMesh->ChunkMeshVolumes[ChunkIndex];
 		}
 		checkSlow(ChunkToActorIndex[ChunkIndex] == INDEX_NONE || ChunkToActorIndex[ChunkIndex] == ActorIndex);
 		ChunkToActorIndex[ChunkIndex] = ActorIndex;
@@ -2719,6 +2732,13 @@ void UBlastMeshComponent::InitBodyForActor(FActorData& ActorData, uint32 ActorIn
 		}
 	}
 
+	// this is to ensure mass of all chunks adds up to root chunk mass
+	if (ActorIndex)
+	{
+		const float IdealChunkMass = RootChunkMass * ThisChunkVolume / TotalVolume;
+		BodyInst->SetMassOverride(FMath::Max(IdealChunkMass, 0.5f)); // min half kg to avoid weird physics
+		UE_LOG(LogTemp, Warning, TEXT("Body %d mass %f"), ActorIndex, BodyInst->GetMassOverride());
+	}
 	BodyInst->bSimulatePhysics = !bIsKinematicActor;
 	BodyInst->InstanceBodyIndex = ActorIndex; // let it be actor index
 	if (bIsAllLeafChunks && !GetUsedBlastMaterial().bGenerateHitEventsForLeafActors)
@@ -2728,6 +2748,9 @@ void UBlastMeshComponent::InitBodyForActor(FActorData& ActorData, uint32 ActorIn
 
 	BodyInst->bStartAwake = true; // Default to true - should we be taking this from higher up?
 	BodyInst->DOFMode = EDOFMode::None;
+
+	// we have to set this before calling InitBody and UpdateMassProperties, as there may be calls to GetBodyInstance
+	ActorData.BodyInstance = BodyInst;
 
 	BodyInst->InitBody(NewBodySetup, ParentActorWorldTransform, this, PhysScene);
 
@@ -2755,7 +2778,11 @@ void UBlastMeshComponent::InitBodyForActor(FActorData& ActorData, uint32 ActorIn
 
 	BodyInst->UpdateMassProperties();
 
-	ActorData.BodyInstance = BodyInst;
+	if (ActorIndex == 0)
+	{
+		RootChunkMass = BodyInst->GetBodyMass();
+	}
+	
 	//This is not totally right, isBoundToWorld actors shouldn't move with the component probably.
 	//Maybe we need to add PhysX constraints to the thing they are touching in world, but for now lump them in with root chunks
 	ActorData.bIsAttachedToComponent = bIsKinematicActor || bContainsRootChunks;

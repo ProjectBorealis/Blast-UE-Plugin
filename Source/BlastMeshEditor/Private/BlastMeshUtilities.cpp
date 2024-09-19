@@ -33,6 +33,7 @@
 #include "BlastMesh.h"
 #include "BlastMeshFactory.h"
 #include "BlastGlobals.h"
+#include "MeshAdapter.h"
 
 #include "NvBlastExtAuthoringTypes.h"
 #include "NvBlastExtAuthoringMesh.h"
@@ -285,6 +286,14 @@ Nv::Blast::Mesh* CreateAuthoringMeshFromRenderData(const FStaticMeshRenderData& 
 	return mesh;
 }
 
+float SignedVolumeOfTriangle(const Nv::Blast::Triangle& t) 
+{
+	const FVector3f& p1 = reinterpret_cast<const FVector3f&>(t.a.p);
+	const FVector3f& p2 = reinterpret_cast<const FVector3f&>(t.b.p);
+	const FVector3f& p3 = reinterpret_cast<const FVector3f&>(t.c.p);
+	return FVector3f::DotProduct(p1, FVector3f::CrossProduct(p2, p3)) / 6.0f;
+}
+
 void PrepareLODData(TSharedPtr<FFractureSession> FractureSession,
                     const TArray<FSkeletalMaterial>& ExistingMaterials, TMap<int32, int32>& InteriorMaterialsToSlots,
                     TArray<FVector3f>& LODPoints, TArray<SkeletalMeshImportData::FMeshWedge>& LODWedges,
@@ -301,8 +310,12 @@ void PrepareLODData(TSharedPtr<FFractureSession> FractureSession,
 
 	TArray<FSkeletalMaterial>& NewMaterials = SkeletalMesh->GetMaterials();
 
-	uint32 FirstChunk = ChunkIndex < 0 ? 0 : ChunkIndex;
-	uint32 LastChunk = ChunkIndex < 0 ? FractureData->chunkCount : ChunkIndex + 1;
+	int32 FirstChunk = ChunkIndex < 0 ? 0 : ChunkIndex;
+	int32 LastChunk = ChunkIndex < 0 ? FractureData->chunkCount : ChunkIndex + 1;
+	if (FractureSession->BlastMesh->ChunkMeshVolumes.Num() < LastChunk)
+	{
+		FractureSession->BlastMesh->ChunkMeshVolumes.AddZeroed(LastChunk - FractureSession->BlastMesh->ChunkMeshVolumes.Num());
+	}
 
 	uint32 TriangleCount = FractureData->geometryOffset[LastChunk] - FractureData->geometryOffset[FirstChunk];
 	LODPoints.AddUninitialized(TriangleCount * 3);
@@ -318,11 +331,14 @@ void PrepareLODData(TSharedPtr<FFractureSession> FractureSession,
 	UVs.AddZeroed(TriangleCount * 3);
 	SmoothingGroups.AddZeroed(TriangleCount);
 	
-	for (uint32 ci = FirstChunk; ci < LastChunk; ci++)
+	for (int32 ci = FirstChunk; ci < LastChunk; ci++)
 	{
+		float MeshVolume = 0.f;
+		
 		for (uint32 fi = FractureData->geometryOffset[ci]; fi < FractureData->geometryOffset[ci + 1]; fi++, FaceIndex++)
 		{
 			Nv::Blast::Triangle& tr = FractureData->geometry[fi];
+			MeshVolume += SignedVolumeOfTriangle(tr);
 			//No need to pass normals, it is computed in mesh builder anyway
 			for (uint32 vi = 0; vi < 3; vi++, VertexIndex++)
 			{
@@ -395,6 +411,8 @@ void PrepareLODData(TSharedPtr<FFractureSession> FractureSession,
 			LODFaces[FaceIndex].SmoothingGroups = FMath::Max(tr.smoothingGroup, 0);
 			SmoothingGroups[FaceIndex] = LODFaces[FaceIndex].SmoothingGroups;
 		}
+
+		FractureSession->BlastMesh->ChunkMeshVolumes[ci] = MeshVolume;
 	}
 
 	FBox3f BoundingBox(LODPoints.GetData(), LODPoints.Num());

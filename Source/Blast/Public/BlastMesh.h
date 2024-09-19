@@ -308,6 +308,9 @@ struct BLAST_API FBlastCookedChunkData
 	UPROPERTY(Instanced)
 	TObjectPtr<class UBodySetup> CookedBodySetup;
 
+	UPROPERTY()
+	FVector2D MeshVolume;
+
 	FBlastCookedChunkData() : CookedBodySetup(nullptr) {}
 
 	void PopulateBodySetup(class UBodySetup* NewBodySetup) const;
@@ -350,6 +353,10 @@ public:
 	/* The physics asset to use for this blast mesh */
 	UPROPERTY(Instanced)
 	TObjectPtr<UPhysicsAsset> PhysicsAsset;
+
+	// The volumes of the meshes of each chunk
+	UPROPERTY()
+	TArray<float> ChunkMeshVolumes;
 
 	// Blast material
 	UPROPERTY(EditAnywhere, Category = "Blast")

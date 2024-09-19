@@ -800,6 +800,7 @@ protected:
 
 	TBitArray<>					ChunkVisibility;
 	TArray<int32>				ChunkToActorIndex;
+	float RootChunkMass = 0.f;
 
 	uint32 DepthCount; // max chunk depth in support graph
 
