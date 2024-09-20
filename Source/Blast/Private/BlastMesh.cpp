@@ -32,6 +32,22 @@ bool UBlastMesh::IsValidBlastMesh()
 
 #if WITH_EDITOR
 
+FTransform3f UBlastMesh::GetTransformUEToBlastCoordinateSystem()
+{
+	return GetTransformBlastToUECoordinateSystem().Inverse();
+}
+
+FTransform3f UBlastMesh::GetTransformBlastToUECoordinateSystem()
+{
+	//Blast coordinate system interpretation is : X = right, Y = forward, Z = up. centimeters
+	//UE4 is X = forward, Y = right, Z = up, centimeters
+
+	FTransform3f BlastToUE4Transform(FTransform::Identity);
+	BlastToUE4Transform.SetRotation(FRotator3f(0, 90.0f, 0).Quaternion()); // rotate from X=right in blast to X=forward in UE
+	BlastToUE4Transform.SetScale3D(FVector3f(-1.0f, 1.0f, 1.0f)); // because of rotation, the Y=forward of blast is now Y=left, so invert that
+	return BlastToUE4Transform;
+}
+
 void UBlastMesh::PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent)
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);
@@ -46,8 +62,7 @@ void UBlastMesh::GetAssetRegistryTags(TArray<FAssetRegistryTag>& OutTags) const
 	//This is used by the reimport code to find the AssetImportData
 	if (AssetImportData)
 	{
-		OutTags.Emplace(UObject::SourceFileTagName(), AssetImportData->GetSourceData().ToJson(),
-		                FAssetRegistryTag::TT_Hidden);
+		OutTags.Emplace(UObject::SourceFileTagName(), AssetImportData->GetSourceData().ToJson(), FAssetRegistryTag::TT_Hidden);
 	}
 #endif
 
@@ -232,143 +247,79 @@ void UBlastMesh::RebuildCookedBodySetupsIfRequired(bool bForceRebuild)
 	}
 }
 
-void UBlastMesh::GetRenderMesh(int32 LODIndex, TArray<FRawMesh>& RawMeshes)
+TArray<FRawMesh> UBlastMesh::GetRenderMeshes(int32 LODIndex) const
 {
-	FSkeletalMeshRenderData* RenderData = Mesh ? Mesh->GetResourceForRendering() : nullptr;
-	if (!RenderData)
-	{
-		return;
-	}
-
-	FSkeletalMeshModel& Resource = *Mesh->GetImportedModel();
-	if (!Resource.LODModels.IsValidIndex(LODIndex))
-	{
-		return;
-	}
+	TArray<FRawMesh> RawMeshes;
+	
+	FSkeletalMeshImportData ImportData;
+	PRAGMA_DISABLE_DEPRECATION_WARNINGS
+	Mesh->LoadLODImportedData(LODIndex, ImportData);
+	PRAGMA_ENABLE_DEPRECATION_WARNINGS
 
 	const int32 ChunkCount = GetChunkCount();
+	RawMeshes.AddDefaulted(ChunkCount);
+	ensure(ChunkIndexToBoneIndex.Num() == ChunkCount);
+
 	TArray<uint32> TempBuffer;
 	TArray<int32> BoneIndexToChunkIndex;
-	BoneIndexToChunkIndex.SetNum(Mesh->GetRefSkeleton().GetNum());
-	for (int32 I = 0; I < BoneIndexToChunkIndex.Num(); I++)
-	{
-		BoneIndexToChunkIndex[I] = INDEX_NONE;
-	}
+	BoneIndexToChunkIndex.Init(INDEX_NONE, ChunkCount + 1);
 	for (int32 I = 0; I < ChunkCount; I++)
 	{
 		BoneIndexToChunkIndex[ChunkIndexToBoneIndex[I]] = I;
 	}
 
-	const FSkeletalMeshLODInfo* SrcLODInfo = Mesh->GetLODInfo(LODIndex);
-	if (!SrcLODInfo)
+	TArray<TSet<int32>> ChunkIndices;
+	TMap<int32, int32> VertToChunkIndex;
+	ChunkIndices.AddDefaulted(ChunkCount);
+	VertToChunkIndex.Reserve(ImportData.Influences.Num());
+	for (const auto& Influence : ImportData.Influences)
 	{
-		return;
-	}
-
-	const FSkeletalMeshLODModel& LODModel = Resource.LODModels[LODIndex];
-	const FSkeletalMeshLODRenderData& LODRenderData = RenderData->LODRenderData[LODIndex];
-
-	if (!LODRenderData.MultiSizeIndexContainer.IsIndexBufferValid())
-	{
-		return;
-	}
-
-	TArray<FSoftSkinVertex> MeshVerts;
-	LODModel.GetVertices(MeshVerts);
-
-	const uint32 NumTexCoords = FMath::Min(LODRenderData.GetNumTexCoords(), (uint32)MAX_MESH_TEXTURE_COORDS);
-	const int32 NumSections = LODModel.Sections.Num();
-	const FRawStaticIndexBuffer16or32Interface& IndexBuffer = *LODRenderData.MultiSizeIndexContainer.GetIndexBuffer();
-
-	for (int32 SectionIndex = 0; SectionIndex < NumSections; SectionIndex++)
-	{
-		const FSkelMeshSection& SkelMeshSection = LODModel.Sections[SectionIndex];
-		if (!SkelMeshSection.bDisabled)
+		if (!BoneIndexToChunkIndex.IsValidIndex(Influence.BoneIndex))
 		{
-			int32 MaterialIndex = SkelMeshSection.MaterialIndex;
-			// use the remapping of material indices for all LODs besides the base LOD 
-			if (LODIndex > 0 && SrcLODInfo->LODMaterialMap.IsValidIndex(SkelMeshSection.MaterialIndex))
+			continue;
+		}
+
+		const int32 ChunkIndex = BoneIndexToChunkIndex[Influence.BoneIndex];
+		if (!RawMeshes.IsValidIndex(ChunkIndex))
+		{
+			continue;
+		}
+
+		ChunkIndices[ChunkIndex].Add(Influence.VertexIndex);
+		VertToChunkIndex.Add(Influence.VertexIndex, ChunkIndex);
+	}
+
+	TMap<int32, int32> VertIndexToVertIndexInChunk;
+	for (const auto& [VertIdx, ChunkIdx] : VertToChunkIndex)
+	{
+		VertIndexToVertIndexInChunk.Add(VertIdx, RawMeshes[ChunkIdx].VertexPositions.Num());
+		RawMeshes[ChunkIdx].VertexPositions.Add(ImportData.Points[VertIdx]);
+	}
+
+	for (const auto& Face : ImportData.Faces)
+	{
+		const int32 VertIdx = ImportData.Wedges[Face.WedgeIndex[0]].VertexIndex;
+		if (const int32* ChunkIdx = VertToChunkIndex.Find(VertIdx))
+		{
+			for (int32 Vert = 0; Vert < 3; Vert++)
 			{
-				MaterialIndex = FMath::Clamp<int32>(SrcLODInfo->LODMaterialMap[SkelMeshSection.MaterialIndex], 0,
-				                                    Mesh->GetMaterials().Num());
+				const auto& Wedge = ImportData.Wedges[Face.WedgeIndex[Vert]];
+				RawMeshes[*ChunkIdx].WedgeIndices.Add(VertIndexToVertIndexInChunk[Wedge.VertexIndex]);
+				RawMeshes[*ChunkIdx].WedgeColors.Add(Wedge.Color);
+				for (uint32 UV = 0; UV < ImportData.NumTexCoords; UV++)
+				{
+					RawMeshes[*ChunkIdx].WedgeTexCoords[UV].Add(Wedge.UVs[UV]);
+				}
+				RawMeshes[*ChunkIdx].WedgeTangentX.Add(Face.TangentX[Vert]);
+				RawMeshes[*ChunkIdx].WedgeTangentY.Add(Face.TangentY[Vert]);
+				RawMeshes[*ChunkIdx].WedgeTangentZ.Add(Face.TangentZ[Vert]);
 			}
-
-			// Build 'wedge' info
-			const int32 NumTriangles = SkelMeshSection.NumTriangles;
-			for (int32 TriIndex = 0; TriIndex < NumTriangles; TriIndex++)
-			{
-				int32 ChunkIndex = INDEX_NONE;
-				for (int32 WedgeIndex = 0; WedgeIndex < 3; WedgeIndex++)
-				{
-					const int32 VertexIndexForWedge = IndexBuffer.Get(
-						SkelMeshSection.BaseIndex + TriIndex * 3 + WedgeIndex);
-					const FSoftSkinVertex& SkinnedVertex = MeshVerts[VertexIndexForWedge];
-
-					FBoneIndexType BoneIndex;
-					if (SkinnedVertex.GetRigidWeightBone(BoneIndex))
-					{
-						ChunkIndex = BoneIndexToChunkIndex[SkelMeshSection.BoneMap[BoneIndex]];
-						break;
-					}
-				}
-
-				if (ChunkIndex == INDEX_NONE || ChunkIndex >= RawMeshes.Num())
-				{
-					continue;
-				}
-				auto& RawMesh = RawMeshes[ChunkIndex];
-				TMap<int32, int32> SkelToChunkMeshVertIdMap;
-
-				// copy face info
-				RawMesh.FaceMaterialIndices.Add(MaterialIndex);
-				//Leave empty since the skeletal mesh code doesn't save this
-				//RawMesh.FaceSmoothingMasks.Add(-1); // Assume this is ignored as bRecomputeNormals is false
-
-				for (int32 WedgeIndex = 0; WedgeIndex < 3; WedgeIndex++)
-				{
-					const int32 VertexIndexForWedge = IndexBuffer.Get(
-						SkelMeshSection.BaseIndex + TriIndex * 3 + WedgeIndex);
-					const FSoftSkinVertex& SkinnedVertex = MeshVerts[VertexIndexForWedge];
-
-					int32* ChunkVertexIndex = SkelToChunkMeshVertIdMap.Find(VertexIndexForWedge);
-					if (ChunkVertexIndex == nullptr)
-					{
-						SkelToChunkMeshVertIdMap.Add(VertexIndexForWedge, RawMesh.VertexPositions.Num());
-						RawMesh.WedgeIndices.Add(RawMesh.VertexPositions.Num());
-						RawMesh.VertexPositions.Add(SkinnedVertex.Position);
-					}
-					else
-					{
-						RawMesh.WedgeIndices.Add(*ChunkVertexIndex);
-					}
-					RawMesh.WedgeTangentX.Add(SkinnedVertex.TangentX);
-					RawMesh.WedgeTangentY.Add(SkinnedVertex.TangentY);
-					RawMesh.WedgeTangentZ.Add(SkinnedVertex.TangentZ);
-
-					for (uint32 TexCoordIndex = 0; TexCoordIndex < MAX_MESH_TEXTURE_COORDS; TexCoordIndex++)
-					{
-						if (TexCoordIndex >= NumTexCoords)
-						{
-							RawMesh.WedgeTexCoords[TexCoordIndex].AddDefaulted();
-						}
-						else
-						{
-							RawMesh.WedgeTexCoords[TexCoordIndex].Add(SkinnedVertex.UVs[TexCoordIndex]);
-						}
-					}
-
-					if (LODRenderData.StaticVertexBuffers.ColorVertexBuffer.IsInitialized())
-					{
-						RawMesh.WedgeColors.Add(SkinnedVertex.Color);
-					}
-					else
-					{
-						RawMesh.WedgeColors.Add(FColor::White);
-					}
-				}
-			}
+			RawMeshes[*ChunkIdx].FaceMaterialIndices.Add(Face.MatIndex);
+			RawMeshes[*ChunkIdx].FaceSmoothingMasks.Add(Face.SmoothingGroups);
 		}
 	}
+
+	return RawMeshes;
 }
 
 void UBlastMesh::CopyFromLoadedAsset(const NvBlastAsset* AssetToCopy, const FGuid& NewAssetGUID)

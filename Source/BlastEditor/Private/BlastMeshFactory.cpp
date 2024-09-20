@@ -111,7 +111,16 @@ UObject* UBlastMeshFactory::FactoryCreateBinary(UClass* InClass, UObject* InPare
 		return nullptr;
 	}
 
-	TransformBlastAssetToUE4CoordinateSystem(LoadedAsset.Get(), ImportUI->FBXImportUI->SkeletalMeshImportData);
+	FTransform3f ImportTransform(FTransform3f::Identity);
+	if (ImportUI->FBXImportUI->SkeletalMeshImportData != nullptr)
+	{
+		ImportTransform = FTransform3f(FRotator3f(ImportUI->FBXImportUI->SkeletalMeshImportData->ImportRotation), FVector3f(ImportUI->FBXImportUI->SkeletalMeshImportData->ImportTranslation), FVector3f(ImportUI->FBXImportUI->SkeletalMeshImportData->ImportUniformScale));
+		if (ImportUI->FBXImportUI->SkeletalMeshImportData->bConvertScene && ImportUI->FBXImportUI->SkeletalMeshImportData->bForceFrontXAxis)
+		{
+			ImportTransform = ImportTransform * FTransform3f(FRotator3f(0, 90.0f, 0).Quaternion());
+		}
+	}
+	TransformBlastAssetToUE4CoordinateSystem(LoadedAsset.Get(), ImportTransform.Inverse());
 
 	if (BlastMesh == nullptr)
 	{
@@ -305,58 +314,6 @@ EReimportResult::Type UBlastMeshFactory::Reimport(UObject* Obj)
 	bReimporting = false;
 
 	return Result;
-}
-
-FTransform3f UBlastMeshFactory::GetTransformUE4ToBlastCoordinateSystem(UFbxSkeletalMeshImportData* SkeletalMeshImportData)
-{
-	return GetTransformBlastToUE4CoordinateSystem(SkeletalMeshImportData).Inverse();
-}
-
-FTransform3f UBlastMeshFactory::GetTransformBlastToUE4CoordinateSystem(UFbxSkeletalMeshImportData* SkeletalMeshImportData)
-{
-	//Blast coordinate system interpretation is : X = right, Y = forward, Z = up. centimeters
-	//UE4 is X = forward, Y = right, Z = up, centimeters
-	//Confusingly in FFbxImporter::ConvertScene:
-	/*
-	// we use -Y as forward axis here when we import. This is odd considering our forward axis is technically +X
-	// but this is to mimic Maya/Max behavior where if you make a model facing +X facing,
-	// when you import that mesh, you want +X facing in engine.
-	// only thing that doesn't work is hand flipping because Max/Maya is RHS but UE is LHS
-	// On the positive note, we now have import transform set up you can do to rotate mesh if you don't like default setting
-	*/
-
-	FTransform3f BlastToUE4Transform;
-	//This pretty confusing, but the internal -Y flip becomes a -X flip due to the Y->X front conversion defined above
-	BlastToUE4Transform.SetScale3D(FVector3f(-1.0f, 1.0f, 1.0f));
-	FTransform3f ImportTransform(FTransform3f::Identity);
-	if (SkeletalMeshImportData != nullptr)
-	{
-		if (SkeletalMeshImportData->bConvertScene && SkeletalMeshImportData->bForceFrontXAxis)
-		{
-			BlastToUE4Transform.SetRotation(FRotator3f(0, -90.0f, 0).Quaternion());
-		}
-
-		ImportTransform = FTransform3f(FRotator3f(SkeletalMeshImportData->ImportRotation), FVector3f(SkeletalMeshImportData->ImportTranslation), FVector3f(SkeletalMeshImportData->ImportUniformScale));
-	}
-	return BlastToUE4Transform * ImportTransform;
-}
-
-void UBlastMeshFactory::TransformBlastAssetToUE4CoordinateSystem(NvBlastAsset* asset, UFbxSkeletalMeshImportData* SkeletalMeshImportData)
-{
-	FTransform3f CombinedImportTransform = GetTransformBlastToUE4CoordinateSystem(SkeletalMeshImportData);
-	NvcQuat BlastToUE4Rotation = ToNvQuat(CombinedImportTransform.GetRotation());
-	NvcVec3 BlastToUE4Scale = ToNvVector(CombinedImportTransform.GetScale3D());
-	NvcVec3 BlastToUE4Translation = ToNvVector(CombinedImportTransform.GetTranslation());
-	NvBlastExtAssetTransformInPlace(asset, &BlastToUE4Scale, &BlastToUE4Rotation, &BlastToUE4Translation);
-}
-
-void UBlastMeshFactory::TransformBlastAssetFromUE4ToBlastCoordinateSystem(NvBlastAsset* asset, UFbxSkeletalMeshImportData* SkeletalMeshImportData)
-{
-	FTransform3f CombinedImportTransform = GetTransformUE4ToBlastCoordinateSystem(SkeletalMeshImportData);
-	NvcQuat BlastToUE4Rotation = ToNvQuat(CombinedImportTransform.GetRotation());
-	NvcVec3 BlastToUE4Scale = ToNvVector(CombinedImportTransform.GetScale3D());
-	NvcVec3 BlastToUE4Translation = ToNvVector(CombinedImportTransform.GetTranslation());
-	NvBlastExtAssetTransformInPlace(asset, &BlastToUE4Scale, &BlastToUE4Rotation, &BlastToUE4Translation);
 }
 
 FText UBlastMeshFactory::GetImportTaskText(const FText& TaskText) const
@@ -840,6 +797,24 @@ FString UBlastMeshFactory::GuessFBXPathFromAsset(const FString& BlastAssetPath)
 		return Visitor.FilesFound[0];
 	}
 	return FString();
+}
+
+void UBlastMeshFactory::TransformBlastAssetToUE4CoordinateSystem(NvBlastAsset* asset, const FTransform3f& Transform)
+{
+	FTransform3f CombinedImportTransform = UBlastMesh::GetTransformBlastToUECoordinateSystem() * Transform;
+	NvcQuat BlastToUE4Rotation = ToNvQuat(CombinedImportTransform.GetRotation());
+	NvcVec3 BlastToUE4Scale = ToNvVector(CombinedImportTransform.GetScale3D());
+	NvcVec3 BlastToUE4Translation = ToNvVector(CombinedImportTransform.GetTranslation());
+	NvBlastExtAssetTransformInPlace(asset, &BlastToUE4Scale, &BlastToUE4Rotation, &BlastToUE4Translation);
+}
+
+void UBlastMeshFactory::TransformBlastAssetFromUE4ToBlastCoordinateSystem(NvBlastAsset* asset, const FTransform3f& Transform)
+{
+	FTransform3f CombinedImportTransform = UBlastMesh::GetTransformUEToBlastCoordinateSystem() * Transform;
+	NvcQuat BlastToUE4Rotation = ToNvQuat(CombinedImportTransform.GetRotation());
+	NvcVec3 BlastToUE4Scale = ToNvVector(CombinedImportTransform.GetScale3D());
+	NvcVec3 BlastToUE4Translation = ToNvVector(CombinedImportTransform.GetTranslation());
+	NvBlastExtAssetTransformInPlace(asset, &BlastToUE4Scale, &BlastToUE4Rotation, &BlastToUE4Translation);
 }
 
 #undef LOCTEXT_NAMESPACE

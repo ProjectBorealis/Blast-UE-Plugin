@@ -4,6 +4,9 @@
 
 #include <fbxsdk.h>
 
+#include "BlastGlobals.h"
+#include "BlastMesh.h"
+
 using namespace Nv::Blast;
 
 FbxAMatrix FbxFileReader::getTransformForNode(FbxNode* node)
@@ -154,14 +157,32 @@ FMeshData FbxFileReader::extractMeshData(FbxGeometryConverter& geoConverter, Fbx
 	FbxStringList uvSetNames;
 	mesh->GetUVSetNames(uvSetNames);
 
+	const FTransform3f UEToBlastTransform = UBlastMesh::GetTransformUEToBlastCoordinateSystem();
+
+	/*FTransform3f ImportTransform(FTransform3f::Identity);
+	//This pretty confusing, but the internal -Y flip becomes a -X flip due to the Y->X front conversion defined above
+	if (SkeletalMeshImportData != nullptr)
+	{
+		if (SkeletalMeshImportData->bConvertScene && SkeletalMeshImportData->bForceFrontXAxis)
+		{
+			BlastToUE4Transform.SetRotation(FRotator3f(0, -90.0f, 0).Quaternion());
+		}
+
+		ImportTransform = FTransform3f(FRotator3f(SkeletalMeshImportData->ImportRotation), FVector3f(SkeletalMeshImportData->ImportTranslation), FVector3f(SkeletalMeshImportData->ImportUniformScale));
+	}
+	UEToBlastTransform = UEToBlastTransform * ImportTransform;*/
+
 	const char* uvSetName = uvSetNames.GetCount() == 0 ? nullptr : uvSetNames.GetStringAt(0);
 
 	int* polyVertices = mesh->GetPolygonVertices();
 
 	uint32 vertIndex = 0;
 
-	FbxAMatrix trans = getTransformForNode(meshNode);
-	FbxAMatrix normalTransf = trans.Inverse().Transpose();
+	// Construct the matrices for the conversion from right handed to left handed system
+	FbxAMatrix TotalMatrix = getTransformForNode(meshNode);
+	FbxAMatrix TotalMatrixForNormal;
+	TotalMatrixForNormal = TotalMatrix.Inverse();
+	TotalMatrixForNormal = TotalMatrixForNormal.Transpose();
 
 	int32 matElements = mesh->GetElementMaterialCount();
 	if (matElements > 1)
@@ -173,7 +194,7 @@ FMeshData FbxFileReader::extractMeshData(FbxGeometryConverter& geoConverter, Fbx
 
 	const int triangleIndexMappingUnflipped[3] = {0, 1, 2};
 	const int triangleIndexMappingFlipped[3] = {2, 1, 0};
-	const int* triangleIndexMapping = trans.Determinant() < 0 ? triangleIndexMappingFlipped : triangleIndexMappingUnflipped;
+	const int* triangleIndexMapping = TotalMatrix.Determinant() < 0 ? triangleIndexMappingFlipped : triangleIndexMappingUnflipped;
 
 	FbxVector4 normVec;
 	FbxVector2 uvVec;
@@ -184,13 +205,15 @@ FMeshData FbxFileReader::extractMeshData(FbxGeometryConverter& geoConverter, Fbx
 		{
 			int polyCPIdx = polyVertices[i * 3 + triangleIndexMapping[vi]];
 			FbxVector4 vert = mesh->GetControlPointAt(polyCPIdx);
-			vert = trans.MultT(vert);
-			Data.Verts.Add({(float)vert[0], (float)vert[1], (float)vert[2]});
+			vert = TotalMatrix.MultT(vert);
+			FVector3f Vert {(float)vert[0], (float)-vert[1], (float)vert[2]};
+			Data.Verts.Add(ToNvVector(UEToBlastTransform.TransformPosition(Vert)));
 
 			if (mesh->GetPolygonVertexNormal(i, vi, normVec))
 			{
-				normVec = normalTransf.MultT(normVec);
-				Data.Normals.Add({(float)normVec[0], (float)normVec[1], (float)normVec[2]});
+				normVec = TotalMatrixForNormal.MultT(normVec);
+				FVector3f Normal {(float)normVec[0], (float)-normVec[1], (float)normVec[2]};
+				Data.Normals.Add(ToNvVector(UEToBlastTransform.TransformVector(Normal)));
 			}
 			else
 			{

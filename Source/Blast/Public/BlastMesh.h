@@ -394,7 +394,7 @@ public:
 	{
 		return ComponentSpaceInitialBoneTransforms[BoneIndex];
 	}
-
+	
 	virtual void PostLoad() override;
 	virtual void PreSave(FObjectPreSaveContext SaveContext) override;
 
@@ -402,8 +402,11 @@ public:
 
 #if WITH_EDITOR
 	void RebuildCookedBodySetupsIfRequired(bool bForceRebuild = false);
-	void GetRenderMesh(int32 LODIndex, TArray<FRawMesh>& RawMeshes);
+	TArray<FRawMesh> GetRenderMeshes(int32 LODIndex) const;
 	virtual void CopyFromLoadedAsset(const NvBlastAsset* AssetToCopy, const FGuid& NewAssetGUID = FGuid::NewGuid()) override;
+	
+	static FTransform3f GetTransformUEToBlastCoordinateSystem();
+	static FTransform3f GetTransformBlastToUECoordinateSystem();
 #endif
 
 	const TArray<FName>& GetChunkIndexToBoneName();

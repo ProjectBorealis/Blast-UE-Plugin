@@ -307,7 +307,7 @@ TSharedPtr<FFractureSession> FBlastFracture::StartFractureSession(UBlastMesh* In
 
 	if (InSourceStaticMesh != nullptr)
 	{
-		UE4ToBlastTransform = UBlastMeshFactory::GetTransformUE4ToBlastCoordinateSystem(nullptr);
+		UE4ToBlastTransform = UBlastMesh::GetTransformUEToBlastCoordinateSystem();
 
 		// Fill required material map
 		TMap<FName, int32> MaterialMap;
@@ -385,15 +385,14 @@ TSharedPtr<FFractureSession> FBlastFracture::StartFractureSession(UBlastMesh* In
 			}
 		}
 		else
-		//If there is no saved fracture tool state, we can load chunks from SkeletalMesh. Note: smoothing groups will be lost.
+		//If there is no saved fracture tool state, we can load chunks from SkeletalMesh.
 		{
-			UE4ToBlastTransform = UBlastMeshFactory::GetTransformUE4ToBlastCoordinateSystem(
-				Cast<UFbxSkeletalMeshImportData>(InBlastMesh->Mesh->GetAssetImportData()));
+			UE4ToBlastTransform = UBlastMesh::GetTransformUEToBlastCoordinateSystem();
+			
 			TArray<FRawMesh> RawMeshes;
-			RawMeshes.SetNum(InBlastMesh->GetChunkCount());
 			{
 				FBlastScopedProfiler SCMP("GetRenderMesh");
-				InBlastMesh->GetRenderMesh(0, RawMeshes);
+				RawMeshes = InBlastMesh->GetRenderMeshes(0);
 			}
 			for (int32 ChunkIdx = 0; ChunkIdx < RawMeshes.Num(); ChunkIdx++)
 			{
@@ -485,8 +484,7 @@ void FBlastFracture::GetVoronoiSites(TSharedPtr<FFractureSession> FractureSessio
 	Sites.SetNumUninitialized(sitesCount);
 	FMemory::Memcpy(Sites.GetData(), sites, sizeof(FVector3f) * sitesCount);
 
-	auto SkelMeshImportData = Cast<UFbxSkeletalMeshImportData>(FractureSession->BlastMesh->Mesh->GetAssetImportData());
-	FTransform3f Converter = UBlastMeshFactory::GetTransformBlastToUE4CoordinateSystem(SkelMeshImportData);
+	FTransform3f Converter = UBlastMesh::GetTransformBlastToUECoordinateSystem();
 	for (FVector3f& p : Sites)
 	{
 		p = Converter.TransformPosition(p);
@@ -725,8 +723,7 @@ void FBlastFracture::Fracture(UBlastFractureSettings* Settings, TSet<int32>& Sel
 	FractureSession->FractureTool->setRemoveIslands(Settings->bRemoveIslands);
 	bool IsCancel = false;
 
-	FTransform3f UE4ToBlastTransform = UBlastMeshFactory::GetTransformUE4ToBlastCoordinateSystem(
-		Cast<UFbxSkeletalMeshImportData>(FractureSession->BlastMesh->Mesh->GetAssetImportData()));
+	FTransform3f UE4ToBlastTransform = UBlastMesh::GetTransformUEToBlastCoordinateSystem();
 
 	for (int32 ChunkIndex : SelectedChunkIndices)
 	{
@@ -921,17 +918,12 @@ void FBlastFracture::BuildChunkHierarchy(UBlastFractureSettings* Settings, TSet<
 	LoadFracturedMesh(Settings->FractureSession, SupportLevel, nullptr, Settings->InteriorMaterial);
 }
 
-bool CreatePhysicsAsset(TSharedPtr<Nv::Blast::AuthoringResult> FractureData, UBlastMesh* BlastMesh,
-                        UFbxSkeletalMeshImportData* SkelMeshImportData = nullptr)
+bool CreatePhysicsAsset(TSharedPtr<Nv::Blast::AuthoringResult> FractureData, UBlastMesh* BlastMesh)
 {
-	if (SkelMeshImportData == nullptr)
-	{
-		SkelMeshImportData = Cast<UFbxSkeletalMeshImportData>(BlastMesh->Mesh->GetAssetImportData());
-	}
 	FBlastScopedProfiler PACP("PhysicsAssetCreation");
 	TMap<FName, TArray<FBlastCollisionHull>> hulls;
 	hulls.Empty();
-	FTransform3f Converter = UBlastMeshFactory::GetTransformBlastToUE4CoordinateSystem(SkelMeshImportData);
+	FTransform3f Converter = UBlastMesh::GetTransformBlastToUECoordinateSystem();
 	for (uint32 ci = 0; ci < FractureData->chunkCount; ci++)
 	{
 		TArray<FBlastCollisionHull>& chunkHulls = hulls.Add(FName(*(UBlastMesh::ChunkPrefix + FString::FromInt(ci))));
@@ -1189,8 +1181,6 @@ void FBlastFracture::LoadFracturedMesh(FFractureSessionPtr FractureSession, int3
 	}
 
 	TArray<FSkeletalMaterial> ExistingMaterials;
-	UFbxSkeletalMeshImportData* SkelMeshImportData = nullptr;
-
 	if (InSourceStaticMesh)
 	{
 		CreateSkeletalMeshFromAuthoring(FS, *InSourceStaticMesh);
@@ -1198,9 +1188,6 @@ void FBlastFracture::LoadFracturedMesh(FFractureSessionPtr FractureSession, int3
 	else
 	{
 		FBlastScopedProfiler USMFAP("UpdateSkeletalMeshFromAuthoring");
-
-		SkelMeshImportData = Cast<UFbxSkeletalMeshImportData>(BlastMesh->Mesh->GetAssetImportData());
-
 		CreateSkeletalMeshFromAuthoring(FS, InteriorMaterial);
 	}
 
@@ -1212,10 +1199,10 @@ void FBlastFracture::LoadFracturedMesh(FFractureSessionPtr FractureSession, int3
 	}
 
 	//* generate NvBlastAsset and setup it for Mesh
-	UBlastMeshFactory::TransformBlastAssetToUE4CoordinateSystem(FS->FractureData->asset, SkelMeshImportData);
+	UBlastMeshFactory::TransformBlastAssetToUE4CoordinateSystem(FS->FractureData->asset);
 	BlastMesh->CopyFromLoadedAsset(FS->FractureData->asset);
 
-	if (!CreatePhysicsAsset(FS->FractureData, BlastMesh, SkelMeshImportData))
+	if (!CreatePhysicsAsset(FS->FractureData, BlastMesh))
 	{
 		return;
 	}
@@ -1462,8 +1449,7 @@ bool FBlastFracture::FractureCutout(TSharedPtr<FFractureSession> FractureSession
 	RandomGenerator->seed(RandomSeed);
 
 	Normal.Normalize();
-	FTransform3f UE4ToBlastTransform = UBlastMeshFactory::GetTransformUE4ToBlastCoordinateSystem(
-		Cast<UFbxSkeletalMeshImportData>(FractureSession->BlastMesh->Mesh->GetAssetImportData()));
+	FTransform3f UE4ToBlastTransform = UBlastMesh::GetTransformUEToBlastCoordinateSystem();
 	//FTransform3f ScaleTr; ScaleTr.SetScale3D(FVector3f(Scale.X, Scale.Y, 1.f) * 0.5f);
 	FTransform3f YawTr(FQuat4f(FVector3f(0.f, 0.f, 1.f), FMath::DegreesToRadians(RotationZ)));
 	FTransform3f Tr(FQuat4f::FindBetweenNormals(FVector3f(0.f, 0.f, 1.f), Normal), Origin);

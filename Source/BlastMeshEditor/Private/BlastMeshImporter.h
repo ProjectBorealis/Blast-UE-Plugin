@@ -3,7 +3,6 @@
 
 #include "CoreMinimal.h"
 
-#include "NvBlastExtAuthoringTypes.h"
 #include "NvCTypes.h"
 
 struct FMeshData

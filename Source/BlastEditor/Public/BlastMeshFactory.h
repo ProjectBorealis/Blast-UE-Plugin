@@ -46,11 +46,10 @@ public:
 
 	bool						bReimporting;
 	TObjectPtr<UBlastMesh>		ReimportMesh;
-
-	BLASTEDITOR_API static FTransform3f GetTransformUE4ToBlastCoordinateSystem(class UFbxSkeletalMeshImportData* SkeletalMeshImportData);
-	BLASTEDITOR_API static FTransform3f GetTransformBlastToUE4CoordinateSystem(class UFbxSkeletalMeshImportData* SkeletalMeshImportData);
-	BLASTEDITOR_API static void TransformBlastAssetFromUE4ToBlastCoordinateSystem(struct NvBlastAsset* asset, class UFbxSkeletalMeshImportData* SkeletalMeshImportData);
-	BLASTEDITOR_API static void TransformBlastAssetToUE4CoordinateSystem(struct NvBlastAsset* asset, class UFbxSkeletalMeshImportData* SkeletalMeshImportData);
+	
+	BLASTEDITOR_API static void TransformBlastAssetFromUE4ToBlastCoordinateSystem(struct NvBlastAsset* asset, const FTransform3f& Transform = FTransform3f::Identity);
+	BLASTEDITOR_API static void TransformBlastAssetToUE4CoordinateSystem(struct NvBlastAsset* asset, const FTransform3f& Transform = FTransform3f::Identity);
+	
 	BLASTEDITOR_API USkeletalMesh* ImportSkeletalMesh(UBlastMesh* BlastMesh, FName skelMeshName, FFeedbackContext* Warn, TMap<FName, TArray<FBlastCollisionHull>>& hulls);
 	BLASTEDITOR_API static bool RebuildPhysicsAsset(UBlastMesh* BlastMesh, const TMap<FName, TArray<FBlastCollisionHull>>& hulls);
 

@@ -428,7 +428,7 @@ bool SExportAssetToFileDialog::ShowWindow(TSharedPtr<FBlastFracture> Fracturer,
 
 
 			UBlastMeshFactory::TransformBlastAssetFromUE4ToBlastCoordinateSystem(
-				FractureSettings->FractureSession->FractureData->asset, nullptr);
+				FractureSettings->FractureSession->FractureData->asset);
 
 
 			for (int32_t i = 0; i < matNames.Num(); ++i)
@@ -451,8 +451,7 @@ bool SExportAssetToFileDialog::ShowWindow(TSharedPtr<FBlastFracture> Fracturer,
 				}
 				delete file;
 			}
-			UBlastMeshFactory::TransformBlastAssetToUE4CoordinateSystem(
-				FractureSettings->FractureSession->FractureData->asset, nullptr);
+			UBlastMeshFactory::TransformBlastAssetToUE4CoordinateSystem(FractureSettings->FractureSession->FractureData->asset);
 			NVBLAST_FREE(buffer);
 			buffer = nullptr;
 			serializer->release();
