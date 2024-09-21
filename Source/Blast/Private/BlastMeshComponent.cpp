@@ -2737,7 +2737,6 @@ void UBlastMeshComponent::InitBodyForActor(FActorData& ActorData, uint32 ActorIn
 	{
 		const float IdealChunkMass = RootChunkMass * ThisChunkVolume / TotalVolume;
 		BodyInst->SetMassOverride(FMath::Max(IdealChunkMass, 0.5f)); // min half kg to avoid weird physics
-		UE_LOG(LogTemp, Warning, TEXT("Body %d mass %f"), ActorIndex, BodyInst->GetMassOverride());
 	}
 	BodyInst->bSimulatePhysics = !bIsKinematicActor;
 	BodyInst->InstanceBodyIndex = ActorIndex; // let it be actor index
