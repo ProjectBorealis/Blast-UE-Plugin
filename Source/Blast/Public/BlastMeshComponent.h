@@ -824,7 +824,7 @@ protected:
 
 	//These are stored in the body instance by a weak pointer so we keep a reference here to keep them alive
 	UPROPERTY(Transient, DuplicateTransient)
-	TArray<UBodySetup*>	ActorBodySetups;
+	TArray<TObjectPtr<UBodySetup>>	ActorBodySetups;
 
 	bool						bAddedOrRemovedActorSinceLastRefresh;
 	bool						bChunkVisibilityChanged;

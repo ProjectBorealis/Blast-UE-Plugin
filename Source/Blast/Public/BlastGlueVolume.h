@@ -18,10 +18,10 @@ public:
 	bool bIsDirty;
 
 	UPROPERTY()
-	TArray<class ABlastGlueVolume*> GlueVolumes;
+	TArray<TObjectPtr<class ABlastGlueVolume>> GlueVolumes;
 
 	UPROPERTY()
-	TArray<class ABlastExtendedSupportStructure*> SupportStructures;
+	TArray<TObjectPtr<class ABlastExtendedSupportStructure>> SupportStructures;
 #endif
 
 #if WITH_EDITOR

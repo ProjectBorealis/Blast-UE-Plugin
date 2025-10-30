@@ -38,7 +38,7 @@ public:
 
 protected:
 	UPROPERTY(EditInstanceOnly, Category = "Blast")
-	TArray<AActor*> StructureActors;
+	TArray<TObjectPtr<AActor>> StructureActors;
 
 	/**
 		Maximal distance between chunks in which bond generation allowed. If equal to zero, only touching chunks will be connected.
