@@ -7,7 +7,7 @@ FString GetBlastDLLPath(FString ConfigFolderName)
 {
 	FString BaseDir = IPluginManager::Get().FindPlugin(TEXT("Blast"))->GetBaseDir();
 	FString DllPath;
-#if PLATFORM_WINDOWS && PLATFORM_64BITS
+#if PLATFORM_WINDOWS
 	DllPath = FPaths::Combine(BaseDir, TEXT("Libraries/Win64/"));
 #elif PLATFORM_LINUX
 	DllPath = FPaths::Combine(BaseDir, TEXT("Libraries/Linux/"));
