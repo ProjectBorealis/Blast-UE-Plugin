@@ -3,6 +3,7 @@
 #include "Engine/OverlapResult.h"
 #include "TimerManager.h"
 #include "PhysicsEngine/BodySetup.h"
+#include "PhysicsEngine/SkeletalBodySetup.h"
 #include "PhysicsEngine/PhysicsAsset.h"
 #include "Math/UnrealMathUtility.h"
 #include "SkeletalRenderPublic.h"

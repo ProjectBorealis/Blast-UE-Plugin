@@ -1,6 +1,10 @@
+// Copyright 1998-2017 Epic Games, Inc. All Rights Reserved.
+
 #include "ViewportBlastMeshComponent.h"
+
 #include "Math/UnrealMathUtility.h"
 #include "PhysicsEngine/PhysicsAsset.h"
+#include "PhysicsEngine/SkeletalBodySetup.h"
 
 UViewportBlastMeshComponent::UViewportBlastMeshComponent(const FObjectInitializer& ObjectInitializer):
 	Super(ObjectInitializer)	

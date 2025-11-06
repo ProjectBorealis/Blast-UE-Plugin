@@ -2,6 +2,7 @@
 #include "PhysicsEngine/PhysicsAsset.h"
 #include "Animation/Skeleton.h"
 #include "PhysicsEngine/BodySetup.h"
+#include "PhysicsEngine/SkeletalBodySetup.h"
 #include "Rendering/SkeletalMeshRenderData.h"
 #include "Rendering/SkeletalMeshModel.h"
 #include "UObject/ObjectSaveContext.h"

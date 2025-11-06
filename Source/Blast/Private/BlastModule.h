@@ -2,7 +2,6 @@
 #include "CoreMinimal.h"
 
 #include "Stats/Stats.h"
-#include "Stats/Stats2.h"
 
 #include "Modules/ModuleInterface.h"
 
