@@ -83,10 +83,7 @@ namespace UnrealBuildTool.Rules
                 {
                     "Core",
                     "CoreUObject",
-                    "Projects",
                     "RenderCore",
-                    "Renderer",
-                    "RHI",
                     "BlastLoader",
                     "PhysicsCore"
                 }

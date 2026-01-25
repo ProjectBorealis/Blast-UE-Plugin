@@ -25,32 +25,26 @@ namespace UnrealBuildTool.Rules
             );
 
             PrivateDependencyModuleNames.AddRange(
-                new string[] {
-                "Blast",
+                new string[] { 
+	            "Blast",
                 "BlastEditor",
                 "Core",
                 "CoreUObject",
                 "InputCore",
                 "RenderCore",
-                "PhysicsCore",
                 "Slate",
                 "SlateCore",
                 "EditorStyle",
                 "UnrealEd",
                 "Projects",
-                "DesktopPlatform",
                 "AdvancedPreviewScene",
                 "AssetTools",
-                "LevelEditor",
-                "MeshMergeUtilities",
-                "RawMesh",
-                "MeshUtilitiesCommon",
                 "MeshDescription",
                 "StaticMeshDescription",
                 "MeshDescriptionOperations",
-                "RHI",
                 "SkeletalMeshUtilitiesCommon",
                 "ImageCore",
+                "ChaosCore",
                 }
             );
 

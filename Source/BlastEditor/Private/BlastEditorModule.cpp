@@ -701,11 +701,11 @@ public:
 
 		SkeletalMesh->SetNumSourceModels(0);
 		SkeletalMesh->AddLODInfo();
-		TArray<FSkeletalMeshLODInfo>& lodInfo = SkeletalMesh->GetLODInfoArray();
+		FSkeletalMeshLODInfo* lodInfo = SkeletalMesh->GetLODInfo(0);
 
-		lodInfo[0].LODHysteresis = 0.02f;
+		lodInfo->LODHysteresis = 0.02f;
 		FSkeletalMeshOptimizationSettings Settings;
-		lodInfo[0].ReductionSettings = Settings;
+		lodInfo->ReductionSettings = Settings;
 
 		SkeletalMesh->CalculateInvRefMatrices();
 		SkeletalMesh->PostEditChange();
