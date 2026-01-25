@@ -43,8 +43,7 @@ public:
 	virtual void Draw(const FSceneView* View, FPrimitiveDrawInterface* PDI) override;
 	FLinearColor GetBackgroundColor() const override { return FLinearColor::Black; }
 	virtual bool InputKey(const FInputKeyEventArgs& EventArgs) override;
-	virtual bool InputAxis(FViewport* Viewport, FInputDeviceId DeviceID, FKey Key, float Delta, float DeltaTime,
-	                       int32 NumSamples = 1, bool bGamepad = false) override;
+	virtual bool InputAxis(const FInputKeyEventArgs& Args) override;
 	virtual void ProcessClick(class FSceneView& View, class HHitProxy* HitProxy, FKey Key, EInputEvent Event,
 	                          uint32 HitX, uint32 HitY) override;
 	virtual void MouseMove(FViewport* Viewport, int32 x, int32 y) override;
@@ -595,15 +594,13 @@ bool FBlastMeshEditorViewportClient::InputKey(const FInputKeyEventArgs& EventArg
 }
 
 
-bool FBlastMeshEditorViewportClient::InputAxis(FViewport* InViewport, FInputDeviceId DeviceID, FKey Key, float Delta,
-                                               float DeltaTime, int32 NumSamples /*= 1*/, bool bGamepad /*= false*/)
+bool FBlastMeshEditorViewportClient::InputAxis(const FInputKeyEventArgs& Args)
 {
-	bool bHandled = FEditorViewportClient::InputAxis(InViewport, DeviceID, Key, Delta, DeltaTime, NumSamples, bGamepad);
+	bool bHandled = FEditorViewportClient::InputAxis(Args);
 
 	if (!bHandled)
 	{
-		bHandled |= static_cast<FAdvancedPreviewScene*>(PreviewScene)->HandleViewportInput(
-			InViewport, DeviceID, Key, Delta, DeltaTime, NumSamples, bGamepad);
+		bHandled |= static_cast<FAdvancedPreviewScene*>(PreviewScene)->HandleViewportInput(Args.Viewport, Args.InputDevice, Args.Key, Args.AmountDepressed, Args.DeltaTime, Args.NumSamples, Args.IsGamepad());
 		if (bHandled)
 			Invalidate();
 	}
@@ -1073,7 +1070,7 @@ TSharedRef<FEditorViewportClient> SBlastMeshEditorViewport::MakeEditorViewportCl
 	return EditorViewportClient.ToSharedRef();
 }
 
-TSharedPtr<SWidget> SBlastMeshEditorViewport::MakeViewportToolbar()
+TSharedPtr<SWidget> SBlastMeshEditorViewport::BuildViewportToolbar()
 {
 	return SNew(SBlastMeshEditorViewportToolbar, SharedThis(this));
 }

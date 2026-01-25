@@ -6,6 +6,8 @@
 #include "PhysicsEngine/PhysicsAsset.h"
 #include "PhysicsEngine/SkeletalBodySetup.h"
 
+#include "NvBlastTypes.h"
+
 UViewportBlastMeshComponent::UViewportBlastMeshComponent(const FObjectInitializer& ObjectInitializer):
 	Super(ObjectInitializer)	
 {
