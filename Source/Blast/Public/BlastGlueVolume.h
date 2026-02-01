@@ -74,7 +74,7 @@ public:
 
 	//These are used to invalidate the components after we are edited
 	UPROPERTY(DuplicateTransient)
-	TSet<class UBlastMeshComponent*> GluedComponents;
+	TSet<TObjectPtr<class UBlastMeshComponent>> GluedComponents;
 #endif
 
 	virtual void PostActorCreated() override;
