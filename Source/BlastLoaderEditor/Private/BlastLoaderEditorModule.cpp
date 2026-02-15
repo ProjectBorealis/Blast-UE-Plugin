@@ -1,9 +1,10 @@
 #include "BlastLoaderEditorModule.h"
 #include "BlastLoader.h"
+#include "HAL/PlatformProcess.h"
 
+#include "Logging/LogMacros.h"
 #include "Misc/Paths.h"
 #include "Modules/ModuleManager.h"
-#include "Logging/LogMacros.h"
 
 IMPLEMENT_MODULE(FBlastLoaderEditorModule, BlastLoaderEditor);
 
