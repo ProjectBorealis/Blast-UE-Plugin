@@ -8,6 +8,7 @@
 #include "PhysicsPublic.h"
 #include "ShowFlags.h"
 #include "SceneManagement.h"
+#include "SceneView.h"
 #include "Physics/Experimental/ChaosScopedSceneLock.h"
 #include "Physics/Experimental/PhysScene_Chaos.h"
 
