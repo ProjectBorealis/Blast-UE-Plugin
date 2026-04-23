@@ -937,6 +937,7 @@ void UBlastMeshComponent::OnCreatePhysicsState()
 	}
 
 	SetSkinnedAsset(BlastMesh->Mesh);
+	NotifyIfSkinnedAssetChanged();
 
 	InitBlastFamily();
 }
@@ -1310,6 +1311,7 @@ void UBlastMeshComponent::OnRegister()
 	{
 		SetSkinnedAsset(BlastMesh->Mesh);
 	}
+	NotifyIfSkinnedAssetChanged();
 	
 	Super::OnRegister();
 
@@ -1667,6 +1669,7 @@ void UBlastMeshComponent::SetBlastMesh(UBlastMesh* NewBlastMesh)
 		FComponentReregisterContext ReregisterComponent(this);
 		BlastMesh = NewBlastMesh;
 		SetSkinnedAsset(BlastMesh ? BlastMesh->Mesh : nullptr);
+		NotifyIfSkinnedAssetChanged();
 		ModifiedAsset = nullptr;
 		ModifiedAssetOwned = nullptr;
 #if WITH_EDITOR
@@ -2467,9 +2470,11 @@ void UBlastMeshComponent::Serialize(FArchive& Ar)
 	if (Ar.IsSaving())
 	{
 		SetSkinnedAsset(nullptr);
+		NotifyIfSkinnedAssetChanged();
 	}
 	Super::Serialize(Ar);
 	SetSkinnedAsset(BlastMesh ? BlastMesh->Mesh : nullptr);
+	NotifyIfSkinnedAssetChanged();
 }
 
 void UBlastMeshComponent::NotifyStressSolverActorCreated(NvBlastActor& BlastActor)
