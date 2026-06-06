@@ -3472,6 +3472,8 @@ FBlastMeshSceneProxy::FBlastMeshSceneProxy(const UBlastMeshComponent* Component,
 	}
 }
 
+// TODO
+#if 0
 void FBlastMeshSceneProxy::DebugDrawPhysicsAsset(int32 ViewIndex, FMeshElementCollector& Collector,
                                                  const FEngineShowFlags& EngineShowFlags) const
 {
@@ -3484,6 +3486,7 @@ void FBlastMeshSceneProxy::DebugDrawPhysicsAsset(int32 ViewIndex, FMeshElementCo
 	const TArray<FTransform>* BoneSpaceBases = FSkeletalMeshSceneProxy::MeshObject->GetComponentSpaceTransforms();
 	RenderPhysicsAsset(ViewIndex, Collector, EngineShowFlags, ProxyLocalToWorld, BoneSpaceBases);
 }
+#endif
 
 void FBlastMeshSceneProxyBase::RenderPhysicsAsset(int32 ViewIndex, FMeshElementCollector& Collector,
                                                   const FEngineShowFlags& EngineShowFlags,

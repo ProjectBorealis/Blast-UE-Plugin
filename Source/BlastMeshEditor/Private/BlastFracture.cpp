@@ -1479,8 +1479,8 @@ bool FBlastFracture::FractureCutout(TSharedPtr<FFractureSession> FractureSession
 		{
 			FMemory::Memset(Buf.GetData() + i*3, Img.RawData[i * Img.GetBytesPerPixel()], 3);
 		}
-		float SegmentationErrorThreshold = 1e-3; //Move this to advanced settings?
-		float SnapThreshold = 1.f;
+		float SegmentationErrorThreshold = 1e-3f; //Move this to advanced settings?
+		float SnapThreshold = 1.0f;
 		NvBlastExtAuthoringBuildCutoutSet(*CutoutConfig.cutoutSet, Buf.GetData(), Pattern->Source.GetSizeX(),
 		                                  Pattern->Source.GetSizeY(), SegmentationErrorThreshold, SnapThreshold,
 		                                  bPeriodic, bFillGaps);

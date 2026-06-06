@@ -878,10 +878,12 @@ public:
 	FBlastMeshSceneProxy(const UBlastMeshComponent* Component, FSkeletalMeshRenderData* InSkelMeshRenderData);
 	virtual ~FBlastMeshSceneProxy() {}
 
+#if 0
 	/**
 	* Render physics asset for debug display
 	*/
 	virtual void DebugDrawPhysicsAsset(int32 ViewIndex, FMeshElementCollector& Collector, const FEngineShowFlags& EngineShowFlags) const override;
+#endif
 
 #if WITH_EDITOR
 	virtual void GetDynamicMeshElements(const TArray<const FSceneView*>& Views, const FSceneViewFamily& ViewFamily, uint32 VisibilityMap, FMeshElementCollector& Collector) const override
