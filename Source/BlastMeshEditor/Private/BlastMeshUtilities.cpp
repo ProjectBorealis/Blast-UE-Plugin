@@ -197,7 +197,7 @@ Nv::Blast::Mesh* CreateAuthoringMeshFromMeshDescription(const FMeshDescription& 
 		const auto EdgesOfTriangle = SourceMeshDescription.GetTriangleEdges(TriID);
 		Facets[TriangleIdx].edgesCount = EdgesOfTriangle.Num();
 
-		const auto VertsOfTriangle = SourceMeshDescription.GetTriangleVertices(TriID);
+		auto VertsOfTriangle = SourceMeshDescription.GetTriangleVertices(TriID);
 		check(VertsOfTriangle.Num() == 3);
 
 		const FVector3f DeducedNormal = FVector3f::CrossProduct(
@@ -209,7 +209,10 @@ Nv::Blast::Mesh* CreateAuthoringMeshFromMeshDescription(const FMeshDescription& 
 			VertexInstanceNormals[VertsOfTriangle[2]];
 		if (FVector3f::DotProduct(AverageNormal, DeducedNormal) < 0.f)
 		{
-			Swap(VertsOfTriangle[0], VertsOfTriangle[1]);
+			std::swap(
+				const_cast<FVertexID&>(VertsOfTriangle[0]),
+				const_cast<FVertexID&>(VertsOfTriangle[1])
+			);
 		}
 
 		Edges.Add({
