@@ -3464,7 +3464,9 @@ FBlastMeshSceneProxy::FBlastMeshSceneProxy(const UBlastMeshComponent* Component,
 	FBlastMeshSceneProxyBase(Component),
 	FSkeletalMeshSceneProxy(Component, InSkelMeshRenderData)
 {
+#if !(UE_BUILD_SHIPPING || UE_BUILD_TEST)
 	PhysicsAssetForDebug = Component->GetBlastMesh()->PhysicsAsset;
+#endif
 
 	if (Component && Component->bPerBoneMotionBlur)
 	{
