@@ -10,7 +10,10 @@ class BlastAllocatorCallback final : public nvidia::NvAllocatorCallback
 	virtual void* allocate(size_t size, const char* typeName, const char* filename, int line)
 	{
 		void* ptr = FMemory::Malloc(size, 0x10);
+		// todo(mcoms): shipping check, binned alloc does not have proper alignment unless you use alignas?
+#if WITH_EDITOR
 		check((reinterpret_cast<size_t>(ptr) & 0x0F) == 0);
+#endif
 		return ptr;
 
 	}
